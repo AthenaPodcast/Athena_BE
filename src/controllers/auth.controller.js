@@ -1,5 +1,6 @@
 require('dotenv').config();
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const transporter = require('../config/email');
 const generateToken = require('../utils/generateToken');
 const { findAccountByEmail, createAccount, verifyAccountEmail } = require('../models/account.model');
@@ -101,10 +102,43 @@ const verifyEmail = async (req, res) => {
   }
 };
 
-// TEMP login stub
-const login = (req, res) => {
-  res.send('Login route not implemented yet');
-};
+// LOGIN
+const login = async (req, res) => {
+    const { email, password } = req.body;
+  
+    try {
+      // 1. Validate input
+      if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required' });
+      }
+  
+      // 2. Check if account exists
+      const user = await findAccountByEmail(email);
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid email or password' });
+      }
+  
+      // 3. Check if email is verified
+      if (!user.email_verified) {
+        return res.status(403).json({ message: 'Email is not verified' });
+      }
+  
+      // 4. Compare password
+      const isMatch = await bcrypt.compare(password, user.password_hash);
+      if (!isMatch) {
+        return res.status(401).json({ message: 'Invalid email or password' });
+      }
+  
+      // 5. Generate JWT
+      const token = generateToken({ accountId: user.id });
+  
+      res.status(200).json({ message: 'Login successful', token });
+  
+    } catch (err) {
+      console.error('Login error:', err);
+      res.status(500).json({ message: 'Server error during login' });
+    }
+  };
 
 module.exports = {
   signup,
