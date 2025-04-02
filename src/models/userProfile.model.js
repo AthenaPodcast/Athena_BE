@@ -8,6 +8,14 @@ const createUserProfile = async (accountId, firstName, lastName) => {
   );
 };
 
+const updateProfileInfo = async (accountId, gender, age) => {
+    await pool.query(
+      `UPDATE UserProfile SET gender = $1, age = $2 WHERE account_id = $3`,
+      [gender, age, accountId]
+    );
+  };
+  
 module.exports = {
-  createUserProfile
+  createUserProfile,
+  updateProfileInfo
 };
