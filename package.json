@@ -10,6 +10,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "athena_be": "file:"
+    "athena_be": "file:",
+    "dotenv": "^16.4.7",
+    "pg": "^8.14.1"
   }
 }
