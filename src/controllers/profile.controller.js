@@ -1,5 +1,6 @@
 const { updateProfileInfo } = require('../models/userProfile.model');
 const { updateProfilePicture } = require('../models/userProfile.model');
+const { insertUserInterests, deleteUserInterests } = require('../models/userProfile.model');
 
 const completeProfile = async (req, res) => {
   const { gender, dateOfBirth } = req.body;
@@ -45,10 +46,33 @@ const uploadProfilePicture = async (req, res) => {
       console.error('Profile picture upload error:', err);
       res.status(500).json({ message: 'Server error uploading profile picture' });
     }
-  };
+};
+
+const saveUserInterests = async (req, res) => {
+    const accountId = req.user.accountId;
+    const { interests } = req.body;
+  
+    if (!Array.isArray(interests) || interests.length === 0) {
+      return res.status(400).json({ message: 'Please provide at least one interest' });
+    }
+  
+    try {
+      // Clear previous interests (good for overwrite)
+      await deleteUserInterests(accountId);
+  
+      // Insert new ones
+      await insertUserInterests(accountId, interests);
+  
+      res.status(200).json({ message: 'Interests saved successfully' });
+    } catch (err) {
+      console.error('Error saving interests:', err);
+      res.status(500).json({ message: 'Server error saving interests' });
+    }
+};
 
 module.exports = {
     completeProfile,
-    uploadProfilePicture
+    uploadProfilePicture,
+    saveUserInterests
 };
   

@@ -23,10 +23,39 @@ const updateProfilePicture = async (accountId, filePath) => {
     );
 };
   
+const insertUserInterests = async (accountId, categoryIds) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+  
+      const query = `
+        INSERT INTO UserInterests (account_id, category_id, created_at)
+        VALUES ($1, $2, NOW())
+      `;
+  
+      for (const categoryId of categoryIds) {
+        await client.query(query, [accountId, categoryId]);
+      }
+  
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+};
+
+const deleteUserInterests = async (accountId) => {
+    await pool.query('DELETE FROM UserInterests WHERE account_id = $1', [accountId]);
+};
+  
 module.exports = {
   createUserProfile,
   updateProfileInfo,
-  updateProfilePicture
+  updateProfilePicture,
+  insertUserInterests,
+  deleteUserInterests
 };
 
 
