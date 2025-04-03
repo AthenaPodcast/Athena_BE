@@ -14,8 +14,20 @@ const updateProfileInfo = async (accountId, gender, age) => {
       [gender, age, accountId]
     );
   };
+
+
+const updateProfilePicture = async (accountId, filePath) => {
+    await pool.query(
+      `UPDATE UserProfile SET profile_picture = $1 WHERE account_id = $2`,
+      [filePath, accountId]
+    );
+};
   
 module.exports = {
   createUserProfile,
-  updateProfileInfo
+  updateProfileInfo,
+  updateProfilePicture
 };
+
+
+  

@@ -1,4 +1,5 @@
 const { updateProfileInfo } = require('../models/userProfile.model');
+const { updateProfilePicture } = require('../models/userProfile.model');
 
 const completeProfile = async (req, res) => {
   const { gender, dateOfBirth } = req.body;
@@ -29,4 +30,25 @@ const completeProfile = async (req, res) => {
   }
 };
 
-module.exports = { completeProfile };
+const uploadProfilePicture = async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+  
+    const filePath = req.file.filename;
+    const accountId = req.user.accountId;
+  
+    try {
+      await updateProfilePicture(accountId, filePath);
+      res.status(200).json({ message: 'Profile picture uploaded successfully' });
+    } catch (err) {
+      console.error('Profile picture upload error:', err);
+      res.status(500).json({ message: 'Server error uploading profile picture' });
+    }
+  };
+
+module.exports = {
+    completeProfile,
+    uploadProfilePicture
+};
+  
