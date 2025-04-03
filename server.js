@@ -17,6 +17,9 @@ app.use(express.json()); // to read JSON bodies
 const authRoutes = require('./src/routes/auth.routes');
 app.use('/api/auth', authRoutes);
 
+const profileRoutes = require('./src/routes/profile.routes');
+app.use('/api/profile', profileRoutes);
+
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
