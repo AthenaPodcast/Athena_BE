@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { signup, login, verifyEmail } = require('../controllers/auth.controller');
 const requireAuth = require('../middlewares/auth.middleware');
+const { forgotPassword } = require('../controllers/auth.controller');
+const { resetPassword } = require('../controllers/auth.controller');
 
 // Routes
 router.post('/signup', signup);
@@ -15,6 +17,9 @@ router.get('/dashboard', requireAuth, (req, res) => {
       user: req.user,
     });
   });
+
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 module.exports = router;
 
