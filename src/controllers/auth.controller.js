@@ -1,7 +1,9 @@
 require('dotenv').config();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const transporter = require('../config/email');
+const pool = require('../../db');
+const crypto = require('crypto');
+const sendEmail = require('../config/email');
 const generateToken = require('../utils/generateToken');
 const { findAccountByEmail, createAccount, verifyAccountEmail } = require('../models/account.model');
 const { createUserProfile } = require('../models/userProfile.model');
@@ -138,10 +140,107 @@ const login = async (req, res) => {
       console.error('Login error:', err);
       res.status(500).json({ message: 'Server error during login' });
     }
-  };
+};
+
+// FORGOT PASS
+const forgotPassword = async (req, res) => {
+    const { email } = req.body;
+  
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+  
+    try {
+      // 1. Check if account exists
+      const result = await pool.query('SELECT * FROM Accounts WHERE email = $1', [email]);
+      const user = result.rows[0];
+  
+      if (!user) {
+        return res.status(404).json({ message: 'No account with that email' });
+      }
+  
+      // 2. Generate reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+  
+      // 3. Save token in DB
+      await pool.query(
+        'UPDATE Accounts SET reset_token = $1, reset_token_expires = $2 WHERE email = $3',
+        [resetToken, expiresAt, email]
+      );
+  
+      // 4. Send email
+      const resetLink = `http://localhost:3000/api/auth/reset-password?token=${resetToken}`;
+      await sendEmail(
+        email,
+        'Reset your password',
+        `Click the link to reset your password: ${resetLink}`
+      );
+  
+      return res.status(200).json({ message: 'Password reset link sent. Please check your email.' });
+  
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      res.status(500).json({ message: 'Error processing forgot password' });
+    }
+};
+
+// RESET PASS
+const resetPassword = async (req, res) => {
+
+  const { token, password, confirmPassword } = req.body;
+
+  if (!token || !password || !confirmPassword) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ message: 'Passwords do not match' });
+  }
+
+  // Password strength (optional but recommended)
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  if (!passwordRegex.test(password)) {
+    return res.status(400).json({
+      message: 'Password must be at least 8 characters and contain uppercase, lowercase, and numbers',
+    });
+  }
+
+  try {
+    // Find user with matching token & check expiry
+    const userResult = await pool.query(
+      'SELECT * FROM Accounts WHERE reset_token = $1 AND reset_token_expires > NOW()',
+      [token]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
+
+    const user = userResult.rows[0];
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Update password & clear reset token
+    await pool.query(
+      'UPDATE Accounts SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2',
+      [hashedPassword, user.id]
+    );
+
+    res.status(200).json({ message: 'Password reset successful. You can now log in with your new password.' });
+
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ message: 'Error resetting password' });
+  }
+};
+
 
 module.exports = {
   signup,
   verifyEmail,
   login,
+  forgotPassword,
+  resetPassword
 };
