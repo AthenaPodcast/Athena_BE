@@ -1,5 +1,6 @@
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
+const { createEpisode } = require('../models/episode.model');
 
 exports.uploadAudioToCloudinary = async (req, res) => {
   try {
@@ -34,3 +35,44 @@ exports.uploadAudioToCloudinary = async (req, res) => {
     res.status(500).json({ message: 'Error uploading audio' });
   }
 };
+
+exports.createEpisode = async (req, res) => {
+  try {
+    const {
+      podcast_id,
+      name,
+      description,
+      picture_url,
+      audio_url,
+      duration,
+      script,
+      release_date
+    } = req.body;
+
+    // Basic validation
+    if (!podcast_id || !name || !audio_url || !duration) {
+      return res.status(400).json({ message: 'Missing required episode fields' });
+    }
+
+    // Insert into DB
+    const episode = await createEpisode({
+      podcast_id,
+      name,
+      description,
+      picture_url,
+      audio_url,
+      duration,
+      script,
+      release_date
+    });
+
+    res.status(201).json({
+      message: 'Episode created successfully',
+      episode
+    });
+  } catch (error) {
+    console.error('Create Episode Error:', error);
+    res.status(500).json({ message: 'Failed to create episode' });
+  }
+};
+

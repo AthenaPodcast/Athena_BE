@@ -20,8 +20,9 @@ app.use('/api/auth', authRoutes);
 const profileRoutes = require('./src/routes/profile.routes');
 app.use('/api/profile', profileRoutes);
 
-const audioRoutes = require('./src/routes/audio.routes');
-app.use('/api/audio', audioRoutes);
+const episodeRoutes = require('./src/routes/episode.routes');
+app.use('/api/episode', episodeRoutes);
+
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
