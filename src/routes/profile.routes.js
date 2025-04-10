@@ -4,23 +4,23 @@ const {
     completeProfile,
     uploadProfilePicture
   } = require('../controllers/profile.controller');
-const requireAuth = require('../middlewares/auth.middleware');
+const { verifyToken } = require('../middlewares/auth.middleware'); 
 const upload = require('../config/multer');
 const { saveUserInterests } = require('../controllers/profile.controller');
 const { deleteUserInterests } = require('../models/userProfile.model');
 
-router.post('/complete', requireAuth, completeProfile);
+router.post('/complete', verifyToken, completeProfile);
 
 router.post(
     '/upload-picture',
-    requireAuth,
+    verifyToken,
     upload.single('profileImage'),
     uploadProfilePicture
 );
 
-router.post('/interests', requireAuth, saveUserInterests);
+router.post('/interests', verifyToken, saveUserInterests);
 
-router.delete('/interests', requireAuth, async (req, res) => {
+router.delete('/interests', verifyToken, async (req, res) => {
     const accountId = req.user.accountId;
   
     try {
