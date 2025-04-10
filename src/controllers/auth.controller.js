@@ -132,8 +132,11 @@ const login = async (req, res) => {
       }
   
       // 5. Generate JWT
-      const token = generateToken({ accountId: user.id });
-  
+      const token = generateToken({
+        accountId: user.id,
+        type: user.account_type  
+      });
+        
       res.status(200).json({ message: 'Login successful', token });
   
     } catch (err) {
