@@ -8,21 +8,8 @@ process.on('unhandledRejection', (err) => {
   console.error('UNHANDLED REJECTION:', err);
 });
 
-const express = require('express');
-const app = express();
+const app = require('./app');
 const port = process.env.PORT || 3000;
-
-app.use(express.json()); // to read JSON bodies
-
-const authRoutes = require('./src/routes/auth.routes');
-app.use('/api/auth', authRoutes);
-
-const profileRoutes = require('./src/routes/profile.routes');
-app.use('/api/profile', profileRoutes);
-
-const episodeRoutes = require('./src/routes/episode.routes');
-app.use('/api/episode', episodeRoutes);
-
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
