@@ -1,6 +1,7 @@
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
 const { createEpisode } = require('../models/episode.model');
+const { getEpisodesByPodcastId } = require('../models/episode.model');
 
 exports.uploadAudioToCloudinary = async (req, res) => {
   try {
@@ -73,6 +74,22 @@ exports.createEpisode = async (req, res) => {
   } catch (error) {
     console.error('Create Episode Error:', error);
     res.status(500).json({ message: 'Failed to create episode' });
+  }
+};
+
+exports.getEpisodes = async (req, res) => {
+  const { podcast_id } = req.query;
+
+  if (!podcast_id) {
+    return res.status(400).json({ message: 'Missing podcast_id in query' });
+  }
+
+  try {
+    const episodes = await getEpisodesByPodcastId(podcast_id);
+    res.status(200).json(episodes);
+  } catch (err) {
+    console.error('Error fetching episodes:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

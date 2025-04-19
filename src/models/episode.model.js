@@ -29,3 +29,16 @@ exports.createEpisode = async (episodeData) => {
   const result = await pool.query(query, values);
   return result.rows[0];
 };
+
+// Get all episodes for a given podcast ID
+exports.getEpisodesByPodcastId = async (podcastId) => {
+  const query = `
+    SELECT id, name, description, picture_url, audio_url, duration, release_date
+    FROM episodes
+    WHERE podcast_id = $1
+    ORDER BY release_date DESC;
+  `;
+
+  const result = await pool.query(query, [podcastId]);
+  return result.rows;
+};
