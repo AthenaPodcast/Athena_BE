@@ -1,7 +1,20 @@
+const pool = require('../../db');
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
 const { createEpisode } = require('../models/episode.model');
 const { getEpisodesByPodcastId } = require('../models/episode.model');
+const { getAudioDuration } = require('../utils/uploadAudio');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
+const { createWriteStream } = require('fs');
+const axios = require('axios');
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
+
+const tmp = require('tmp');
+const fs = require('fs');
 
 exports.uploadAudioToCloudinary = async (req, res) => {
   try {
@@ -37,43 +50,106 @@ exports.uploadAudioToCloudinary = async (req, res) => {
   }
 };
 
+// exports.createEpisode = async (req, res) => {
+//   try {
+//     const {
+//       podcast_id,
+//       name,
+//       description,
+//       picture_url,
+//       audio_url,
+//       duration,
+//       script,
+//       release_date
+//     } = req.body;
+
+//     // Basic validation
+//     if (!podcast_id || !name || !audio_url || !duration) {
+//       return res.status(400).json({ message: 'Missing required episode fields' });
+//     }
+
+//     // Insert into DB
+//     const episode = await createEpisode({
+//       podcast_id,
+//       name,
+//       description,
+//       picture_url,
+//       audio_url,
+//       duration,
+//       script,
+//       release_date
+//     });
+
+//     res.status(201).json({
+//       message: 'Episode created successfully',
+//       episode
+//     });
+//   } catch (error) {
+//     console.error('Create Episode Error:', error);
+//     res.status(500).json({ message: 'Failed to create episode' });
+//   }
+// };
+
 exports.createEpisode = async (req, res) => {
+  console.log('Incoming create episode request body:', req.body);
+  console.log('From user:', req.user);
+
+  const { podcast_id, name, description, picture_url, audio_url, release_date } = req.body;
+
+  if (!podcast_id || !name || !release_date || !audio_url) {
+    return res.status(400).json({ message: 'Missing required fields including audio_url' });
+  }
+
   try {
-    const {
-      podcast_id,
-      name,
-      description,
-      picture_url,
-      audio_url,
-      duration,
-      script,
-      release_date
-    } = req.body;
 
-    // Basic validation
-    if (!podcast_id || !name || !audio_url || !duration) {
-      return res.status(400).json({ message: 'Missing required episode fields' });
+    const response = await axios.get(audio_url, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(response.data, 'binary');
+
+    const getAudioDuration = (buffer) => {
+      return new Promise((resolve, reject) => {
+        tmp.file({ postfix: '.mp3' }, (err, path, fd, cleanupCallback) => {
+          if (err) return reject(err);
+
+          fs.writeFileSync(path, buffer); // write buffer to temp file
+
+          ffmpeg.ffprobe(path, (err, metadata) => {
+            cleanupCallback(); // remove temp file
+            if (err) return reject(err);
+            if (!metadata || !metadata.format || !metadata.format.duration) {
+              return reject('Duration not found in metadata');
+            }
+
+            const durationInSeconds = Math.round(metadata.format.duration);
+            resolve(durationInSeconds);
+          });
+        });
+      });
+    };
+
+    const duration = await getAudioDuration(buffer);
+    console.log('Duration (seconds):', duration);
+
+    if (!duration || isNaN(duration)) {
+      return res.status(400).json({ message: 'Unable to extract valid audio duration.' });
     }
+    
+    const insertQuery = `
+      INSERT INTO episodes (podcast_id, name, description, picture_url, audio_url, duration, release_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *;
+    `;
 
-    // Insert into DB
-    const episode = await createEpisode({
-      podcast_id,
-      name,
-      description,
-      picture_url,
-      audio_url,
-      duration,
-      script,
-      release_date
-    });
+    const values = [podcast_id, name, description, picture_url, audio_url, duration, release_date];
+    const result = await pool.query(insertQuery, values);
 
-    res.status(201).json({
+    return res.status(201).json({
       message: 'Episode created successfully',
-      episode
+      episode: result.rows[0],
     });
+
   } catch (error) {
-    console.error('Create Episode Error:', error);
-    res.status(500).json({ message: 'Failed to create episode' });
+    console.error('Error creating episode:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
