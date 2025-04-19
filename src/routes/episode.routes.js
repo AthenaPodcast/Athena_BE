@@ -28,6 +28,6 @@ router.post(
 );
 
 // Get episodes for a specific podcast
-router.get('/', getEpisodes);
+router.get('/', verifyToken, getEpisodes);
 
 module.exports = router;
