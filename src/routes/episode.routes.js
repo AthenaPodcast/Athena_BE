@@ -5,6 +5,7 @@ const { uploadAudioToCloudinary, createEpisode } = require('../controllers/episo
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { requireChannel, validatePodcastOwnership } = require('../middlewares/channel.middleware');
 const { getEpisodes } = require('../controllers/episode.controller');
+const { getEpisodeDetails } = require('../controllers/episode.controller');
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -29,5 +30,9 @@ router.post(
 
 // Get episodes for a specific podcast
 router.get('/', verifyToken, getEpisodes);
+
+// Fetch episode details
+router.get('/:id', getEpisodeDetails);
+
 
 module.exports = router;

@@ -3,6 +3,7 @@ const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
 const { createEpisode } = require('../models/episode.model');
 const { getEpisodesByPodcastId } = require('../models/episode.model');
+const { getEpisodeDetails } = require('../models/episode.model');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
@@ -145,3 +146,18 @@ exports.getEpisodes = async (req, res) => {
   }
 };
 
+exports.getEpisodeDetails = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const episode = await getEpisodeDetails(id);
+
+    if (!episode) {
+      return res.status(404).json({ message: 'Episode not found' });
+    }
+
+    return res.status(200).json(episode);
+  } catch (err) {
+    console.error('Error fetching episode details:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
