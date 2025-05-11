@@ -1,6 +1,6 @@
 const pool = require('../../db');
 
-exports.createEpisode = async (episodeData) => {
+const createEpisode = async (episodeData) => {
   const {
     podcast_id,
     name,
@@ -31,7 +31,7 @@ exports.createEpisode = async (episodeData) => {
 };
 
 // Get all episodes for a given podcast ID
-exports.getEpisodesByPodcastId = async (podcastId) => {
+const getEpisodesByPodcastId = async (podcastId) => {
   const query = `
     SELECT id, name, description, picture_url, audio_url, duration, release_date
     FROM episodes
@@ -44,7 +44,7 @@ exports.getEpisodesByPodcastId = async (podcastId) => {
 };
 
 // Fetch episode details
-exports.getEpisodeDetails = async (episode_id) => {
+const getEpisodeDetails = async (episode_id) => {
   const query = `
     SELECT 
       e.id AS episode_id,
@@ -70,15 +70,6 @@ exports.getEpisodeDetails = async (episode_id) => {
 };
 
 // Like or unlike an episode (toggle)
-// const upsertEpisodeLike = async (accountId, episodeId, liked) => {
-//   const query = `
-//     INSERT INTO episode_likes (account_id, episode_id, liked)
-//     VALUES ($1, $2, $3)
-//     ON CONFLICT (account_id, episode_id)
-//     DO UPDATE SET liked = $3
-//   `;
-//   await pool.query(query, [accountId, episodeId, liked]);
-// };
 const toggleEpisodeLike = async (accountId, episodeId) => {
   const result = await pool.query(
     'SELECT liked FROM episode_likes WHERE account_id = $1 AND episode_id = $2',
@@ -104,7 +95,6 @@ const toggleEpisodeLike = async (accountId, episodeId) => {
   }
 };
 
-
 // get episode like status 
 const getEpisodeLike = async (accountId, episodeId) => {
   const query = `
@@ -115,8 +105,40 @@ const getEpisodeLike = async (accountId, episodeId) => {
   return result.rows[0] || null;
 };
 
+// get list of liked episodes 
+const getLikedEpisodes = async (accountId) => {
+  const query = `
+    SELECT 
+      e.id AS episode_id,
+      e.name AS episode_name,
+      e.picture_url AS episode_picture,
+      p.name AS podcast_name
+    FROM episode_likes el
+    JOIN episodes e ON el.episode_id = e.id
+    JOIN podcasts p ON e.podcast_id = p.id
+    WHERE el.account_id = $1 AND el.liked = true
+    ORDER BY e.created_at DESC
+  `;
+  const result = await pool.query(query, [accountId]);
+  return result.rows;
+};
+
+// count of liked episodes 
+const countLikedEpisodes = async (accountId) => {
+  const query = `
+    SELECT COUNT(*) FROM episode_likes
+    WHERE account_id = $1 AND liked = true
+  `;
+  const result = await pool.query(query, [accountId]);
+  return parseInt(result.rows[0].count);
+};
+
 module.exports = {
-  // upsertEpisodeLike,
+  createEpisode,
+  getEpisodesByPodcastId,
+  getEpisodeDetails,
   toggleEpisodeLike,
   getEpisodeLike,
+  getLikedEpisodes,
+  countLikedEpisodes
 };

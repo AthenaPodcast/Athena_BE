@@ -1,12 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { uploadAudioToCloudinary, createEpisode } = require('../controllers/episode.controller');
+const {
+    uploadAudioToCloudinary,
+    createEpisode,
+    getEpisodes,
+    getEpisodeDetails,
+    likeEpisode,
+    getEpisodeLikeStatus,
+    getLikedEpisodes
+  } = require('../controllers/episode.controller');
+
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { requireChannel, validatePodcastOwnership } = require('../middlewares/channel.middleware');
-const { getEpisodes } = require('../controllers/episode.controller');
-const { getEpisodeDetails } = require('../controllers/episode.controller');
-const { likeEpisode, getEpisodeLikeStatus } = require('../controllers/episode.controller');
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -20,7 +26,7 @@ router.post(
     uploadAudioToCloudinary
 );
   
-// Create episode in DB (protected)
+// Create episode in DB (protected) - for authenticated channel
 router.post(
     '/create',
     verifyToken,
@@ -32,12 +38,16 @@ router.post(
 // Get episodes for a specific podcast
 router.get('/', verifyToken, getEpisodes);
 
-// Fetch episode details
-router.get('/:id', getEpisodeDetails);
-
-// like
-// router.post('/:episodeId/like', verifyToken, likeEpisode);
+// like/unlike an episode (toggle)
 router.post('/:id/like', verifyToken, likeEpisode);
+
+// get like status for an episode
 router.get('/:episodeId/like', verifyToken, getEpisodeLikeStatus);
+
+// Get liked episodes with count
+router.get('/liked', verifyToken, getLikedEpisodes);
+
+// get episode details
+router.get('/:id', getEpisodeDetails);
 
 module.exports = router;

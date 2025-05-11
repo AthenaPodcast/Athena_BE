@@ -11,6 +11,7 @@ const axios = require('axios');
 const tmp = require('tmp');
 const fs = require('fs');
 const { toggleEpisodeLike, getEpisodeLike } = require('../models/episode.model');
+const { getLikedEpisodes, countLikedEpisodes } = require('../models/episode.model');
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
@@ -193,5 +194,22 @@ exports.getEpisodeLikeStatus = async (req, res) => {
   } catch (err) {
     console.error('Like status fetch error:', err);
     res.status(500).json({ message: 'Failed to retrieve like status' });
+  }
+};
+
+exports.getLikedEpisodes = async (req, res) => {
+  const accountId = req.user.accountId;
+
+  try {
+    const episodes = await getLikedEpisodes(accountId);
+    const count = await countLikedEpisodes(accountId);
+
+    res.status(200).json({
+      count,
+      episodes
+    });
+  } catch (err) {
+    console.error('Liked episodes fetch error:', err);
+    res.status(500).json({ message: 'Failed to fetch liked episodes' });
   }
 };
