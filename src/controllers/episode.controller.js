@@ -10,6 +10,7 @@ const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
 const axios = require('axios');
 const tmp = require('tmp');
 const fs = require('fs');
+const { toggleEpisodeLike, getEpisodeLike } = require('../models/episode.model');
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
@@ -159,5 +160,38 @@ exports.getEpisodeDetails = async (req, res) => {
   } catch (err) {
     console.error('Error fetching episode details:', err);
     return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.likeEpisode = async (req, res) => {
+  const accountId = req.user.accountId;
+  const episodeId = parseInt(req.params.id, 10);
+
+  if (isNaN(episodeId)) {
+    return res.status(400).json({ message: 'Invalid episode ID' });
+  }
+
+  try {
+    const liked = await toggleEpisodeLike(accountId, episodeId);
+    res.status(200).json({
+      message: liked ? 'Episode liked' : 'Episode unliked',
+      liked
+    });
+  } catch (err) {
+    console.error('Error toggling like:', err);
+    res.status(500).json({ message: 'Failed to toggle like status' });
+  }
+};
+
+exports.getEpisodeLikeStatus = async (req, res) => {
+  const { episodeId } = req.params;
+  const accountId = req.user.accountId;
+
+  try {
+    const result = await getEpisodeLike(accountId, episodeId);
+    res.status(200).json({ liked: result?.liked || false });
+  } catch (err) {
+    console.error('Like status fetch error:', err);
+    res.status(500).json({ message: 'Failed to retrieve like status' });
   }
 };

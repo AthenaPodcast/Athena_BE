@@ -68,3 +68,55 @@ exports.getEpisodeDetails = async (episode_id) => {
   const result = await pool.query(query, [episode_id]);
   return result.rows[0];
 };
+
+// Like or unlike an episode (toggle)
+// const upsertEpisodeLike = async (accountId, episodeId, liked) => {
+//   const query = `
+//     INSERT INTO episode_likes (account_id, episode_id, liked)
+//     VALUES ($1, $2, $3)
+//     ON CONFLICT (account_id, episode_id)
+//     DO UPDATE SET liked = $3
+//   `;
+//   await pool.query(query, [accountId, episodeId, liked]);
+// };
+const toggleEpisodeLike = async (accountId, episodeId) => {
+  const result = await pool.query(
+    'SELECT liked FROM episode_likes WHERE account_id = $1 AND episode_id = $2',
+    [accountId, episodeId]
+  );
+
+  if (result.rows.length > 0) {
+    const newStatus = !result.rows[0].liked;
+
+    await pool.query(
+      'UPDATE episode_likes SET liked = $1 WHERE account_id = $2 AND episode_id = $3',
+      [newStatus, accountId, episodeId]
+    );
+
+    return newStatus;
+  } else {
+    await pool.query(
+      'INSERT INTO episode_likes (account_id, episode_id, liked) VALUES ($1, $2, true)',
+      [accountId, episodeId]
+    );
+
+    return true;
+  }
+};
+
+
+// get episode like status 
+const getEpisodeLike = async (accountId, episodeId) => {
+  const query = `
+    SELECT liked FROM episode_likes
+    WHERE account_id = $1 AND episode_id = $2
+  `;
+  const result = await pool.query(query, [accountId, episodeId]);
+  return result.rows[0] || null;
+};
+
+module.exports = {
+  // upsertEpisodeLike,
+  toggleEpisodeLike,
+  getEpisodeLike,
+};

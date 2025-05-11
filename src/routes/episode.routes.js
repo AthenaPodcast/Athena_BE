@@ -6,6 +6,7 @@ const { verifyToken } = require('../middlewares/auth.middleware');
 const { requireChannel, validatePodcastOwnership } = require('../middlewares/channel.middleware');
 const { getEpisodes } = require('../controllers/episode.controller');
 const { getEpisodeDetails } = require('../controllers/episode.controller');
+const { likeEpisode, getEpisodeLikeStatus } = require('../controllers/episode.controller');
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -34,5 +35,9 @@ router.get('/', verifyToken, getEpisodes);
 // Fetch episode details
 router.get('/:id', getEpisodeDetails);
 
+// like
+// router.post('/:episodeId/like', verifyToken, likeEpisode);
+router.post('/:id/like', verifyToken, likeEpisode);
+router.get('/:episodeId/like', verifyToken, getEpisodeLikeStatus);
 
 module.exports = router;
