@@ -1,5 +1,6 @@
 const { saveOrUpdateProgress } = require('../models/listen.model');
 const { getProgress } = require('../models/listen.model');
+const { getRecentlyPlayedEpisodes } = require('../models/listen.model');
 
 // POST /api/episodes/:id/progress
 exports.saveProgress = async (req, res) => {
@@ -46,3 +47,17 @@ exports.getProgress = async (req, res) => {
     res.status(500).json({ message: 'Server error getting progress' });
   }
 };
+
+// GET /api/recently-played
+exports.getRecentlyPlayed = async (req, res) => {
+    const accountId = req.user.accountId;
+  
+    try {
+      const episodes = await getRecentlyPlayedEpisodes(accountId);
+      res.status(200).json({ episodes });
+    } catch (err) {
+      console.error('Recently Played fetch error:', err);
+      res.status(500).json({ message: 'Failed to fetch recently played episodes' });
+    }
+  };
+
