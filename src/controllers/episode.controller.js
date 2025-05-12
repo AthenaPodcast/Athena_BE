@@ -1,17 +1,25 @@
 const pool = require('../../db');
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
-const { createEpisode } = require('../models/episode.model');
-const { getEpisodesByPodcastId } = require('../models/episode.model');
-const { getEpisodeDetails } = require('../models/episode.model');
+const { 
+  createEpisode,
+  getEpisodesByPodcastId,
+  getEpisodeDetails,
+  toggleEpisodeLike, 
+  getEpisodeLike,
+  getLikedEpisodes,
+  countLikedEpisodes,
+  updateEpisodeScript 
+ } = require('../models/episode.model');
+ 
+const { transcribeAudioFromUrl } = require('../utils/transcribe');
+
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
 const axios = require('axios');
 const tmp = require('tmp');
 const fs = require('fs');
-const { toggleEpisodeLike, getEpisodeLike } = require('../models/episode.model');
-const { getLikedEpisodes, countLikedEpisodes } = require('../models/episode.model');
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
@@ -211,5 +219,27 @@ exports.getLikedEpisodes = async (req, res) => {
   } catch (err) {
     console.error('Liked episodes fetch error:', err);
     res.status(500).json({ message: 'Failed to fetch liked episodes' });
+  }
+};
+
+
+exports.generateScript = async (req, res) => {
+  const { episodeId } = req.params;
+
+  try {
+    const result = await pool.query(`SELECT audio_url FROM episodes WHERE id = $1`, [episodeId]);
+    const episode = result.rows[0];
+
+    if (!episode || !episode.audio_url) {
+      return res.status(404).json({ message: 'Episode not found or missing audio_url' });
+    }
+
+    const transcript = await transcribeAudioFromUrl(episode.audio_url);
+    const updatedEpisode = await updateEpisodeScript(episodeId, transcript);
+
+    res.status(200).json({ message: 'Script generated', script: updatedEpisode.script });
+  } catch (err) {
+    console.error('Transcription error:', err);
+    res.status(500).json({ message: 'Failed to generate script' });
   }
 };

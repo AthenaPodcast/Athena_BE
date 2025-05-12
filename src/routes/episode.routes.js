@@ -8,7 +8,8 @@ const {
     getEpisodeDetails,
     likeEpisode,
     getEpisodeLikeStatus,
-    getLikedEpisodes
+    getLikedEpisodes,
+    generateScript 
   } = require('../controllers/episode.controller');
 
 const { verifyToken } = require('../middlewares/auth.middleware');
@@ -49,5 +50,8 @@ router.get('/liked', verifyToken, getLikedEpisodes);
 
 // get episode details
 router.get('/:id', getEpisodeDetails);
+
+// generate script for the audio
+router.post('/:episodeId/generate-script', verifyToken, requireChannel, generateScript);
 
 module.exports = router;

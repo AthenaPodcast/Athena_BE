@@ -133,6 +133,14 @@ const countLikedEpisodes = async (accountId) => {
   return parseInt(result.rows[0].count);
 };
 
+// episode script
+const updateEpisodeScript = async (episodeId, scriptText) => {
+  const query = `UPDATE episodes SET script = $1 WHERE id = $2 RETURNING *`;
+  const values = [scriptText, episodeId];
+  const result = await pool.query(query, values);
+  return result.rows[0];
+};
+
 module.exports = {
   createEpisode,
   getEpisodesByPodcastId,
@@ -140,5 +148,6 @@ module.exports = {
   toggleEpisodeLike,
   getEpisodeLike,
   getLikedEpisodes,
-  countLikedEpisodes
+  countLikedEpisodes,
+  updateEpisodeScript
 };
