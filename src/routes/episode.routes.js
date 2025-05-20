@@ -9,7 +9,8 @@ const {
     likeEpisode,
     getEpisodeLikeStatus,
     getLikedEpisodes,
-    generateScript 
+    generateScript,
+    fullUploadEpisode 
   } = require('../controllers/episode.controller');
 
 const { verifyToken } = require('../middlewares/auth.middleware');
@@ -53,5 +54,16 @@ router.get('/:id', getEpisodeDetails);
 
 // generate script for the audio
 router.post('/:episodeId/generate-script', verifyToken, requireChannel, generateScript);
+
+
+// POST /api/episodes/full-upload
+router.post(
+  '/full-upload',
+  verifyToken,                   
+  requireChannel,                
+  upload.single('audio'),        
+  fullUploadEpisode              
+);
+
 
 module.exports = router;

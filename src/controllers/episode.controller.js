@@ -222,7 +222,6 @@ exports.getLikedEpisodes = async (req, res) => {
   }
 };
 
-
 exports.generateScript = async (req, res) => {
   const { episodeId } = req.params;
 
@@ -241,5 +240,86 @@ exports.generateScript = async (req, res) => {
   } catch (err) {
     console.error('Transcription error:', err);
     res.status(500).json({ message: 'Failed to generate script' });
+  }
+};
+
+// full upload episode (audio, metadata, script with time)
+exports.fullUploadEpisode = async (req, res) => {
+  try {
+    const { podcast_id, name, description, release_date } = req.body;
+    const audioFile = req.file;
+
+    if (req.user.type !== 'channel') {
+      return res.status(403).json({ error: 'Only channel accounts can upload episodes' });
+    }
+
+    if (!audioFile) return res.status(400).json({ error: 'Audio file is required' });
+
+    // upload audio to cloudinary
+    const streamUpload = (fileBuffer) => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'video',
+            folder: 'episods',
+          },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+        
+        stream.end(fileBuffer);
+      });
+    };
+    
+    const uploadResult = await streamUpload(audioFile.buffer);
+
+
+    const audioUrl = uploadResult.secure_url;
+
+    // extract duration of audio with FFmpeg
+    const duration = await new Promise((resolve, reject) => {
+      ffmpeg.ffprobe(audioUrl, (err, metadata) => {
+        if (err) return reject(err);
+        resolve(Math.floor(metadata.format.duration));
+      });
+    });
+
+    // transcribe audio
+    const { script, transcriptJson } = await transcribeAudioFromUrl(audioUrl);
+
+    console.log('Saving episode with:', {
+      scriptLength: script.length,
+      wordCount: transcriptJson.length,
+      firstWord: transcriptJson[0],
+    });
+    
+    // save episode to DB
+    const result = await pool.query(
+      `INSERT INTO episodes (podcast_id, name, description, audio_url, release_date, duration, script, transcript_json)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id`,
+      [podcast_id, name, description, audioUrl, release_date, duration, script, JSON.stringify(transcriptJson)]
+    );
+
+
+    // clean up 
+    if (audioFile.path && fs.existsSync(audioFile.path)) {
+      fs.unlinkSync(audioFile.path);
+    }
+
+
+    res.status(201).json({
+      message: 'Episode uploaded and transcribed successfully',
+      episode_id: result.rows[0].id,
+      audio_url: audioUrl,
+      duration,
+      script,
+      transcript_json: transcriptJson,
+    });
+  } catch (err) {
+    console.error('fullUploadEpisode error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 };
