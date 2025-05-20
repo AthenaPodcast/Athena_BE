@@ -67,6 +67,110 @@ async function transcribeBuffer(filepath) {
 }
 
 // main function
+// async function transcribeAudioFromUrl(url) {
+//   const id = uuidv4();
+//   const originalPath = path.join(__dirname, `temp_original_${id}.mp3`);
+//   const compressedPath = path.join(__dirname, `temp_compressed_${id}.mp3`);
+//   const chunkDir = path.join(__dirname, `chunks_${id}`);
+//   fs.mkdirSync(chunkDir);
+
+//   try {
+//     await downloadAudio(url, `temp_original_${id}.mp3`);
+//     let sourcePath = originalPath;
+
+//     const fileSize = fs.statSync(originalPath).size;
+//     if (fileSize > MAX_SIZE) {
+//       console.log('File too big – compressing...');
+//       await compressAudio(originalPath, compressedPath);
+
+//       const compressedSize = fs.statSync(compressedPath).size;
+//       if (compressedSize > MAX_SIZE) {
+//         console.log('Compressed file still too large – splitting...');
+//         await splitAudio(compressedPath, chunkDir);
+//         sourcePath = null;
+//       } else {
+//         sourcePath = compressedPath;
+//       }
+//     }
+
+//     // const transcripts = [];
+//     let offset = 0;
+//     let fullText = '';
+//     let mergedWords = [];
+
+//     if (sourcePath) {
+//       const result = await transcribeBuffer(sourcePath);
+//       fullText = result.text;
+//       for (const segment of result.segments || []) {
+//         if (Array.isArray(segment.words)) {
+//           for (const word of segment.words) {
+//             mergedWords.push({
+//               word: word.word,
+//               start: word.start + offset, 
+//               end: word.end + offset
+//             });
+//           }
+//         }
+//       }
+//     } else {
+//       const chunkFiles = fs.readdirSync(chunkDir).filter(f => f.endsWith('.mp3'));
+//       for (const file of chunkFiles) {
+//         const filePath = path.join(chunkDir, file);
+//         const result = await transcribeBuffer(filePath);
+//         fullText += result.text + ' ';
+
+//       for (const segment of result.segments || []) {
+//         if (Array.isArray(segment.words)) {
+//           for (const word of segment.words) {
+//             mergedWords.push({
+//               word: word.word,
+//               start: word.start + offset,
+//               end: word.end + offset,
+//             });
+//           }
+//         }
+//       }
+
+
+//         // add real-time offset based on last word
+//         const lastSegment = result.segments[result.segments.length - 1];
+//         offset += lastSegment ? lastSegment.end : SEGMENT_DURATION;
+
+//       }
+//     }
+
+//     // const transcriptJson = mergedWords.map(word => ({
+//     //   word: word.word,
+//     //   start: word.start,
+//     //   end: word.end
+//     // }));
+
+//   console.log('FINAL WORD COUNT:', mergedWords.length);
+//   console.log("🧪 First word object:", mergedWords[0]);
+//   console.log("🧪 Merged word count:", mergedWords.length);
+//   console.log("🧪 Flattened?", Array.isArray(mergedWords[0]));
+
+//   return {
+//     script: fullText.trim(),
+//     transcriptJson: mergedWords
+//   };
+    
+//   } catch (err) {
+//     console.error('Transcription error:', err);
+//     throw err;
+
+//   } finally {
+//     // cleanup
+//     [originalPath, compressedPath].forEach(p => fs.existsSync(p) && fs.unlinkSync(p));
+//     if (fs.existsSync(chunkDir)) {
+//       fs.readdirSync(chunkDir).forEach(f => fs.unlinkSync(path.join(chunkDir, f)));
+//       fs.rmdirSync(chunkDir);
+//     }
+//   }
+// }
+//////////////////////////////////
+
+// main function
 async function transcribeAudioFromUrl(url) {
   const id = uuidv4();
   const originalPath = path.join(__dirname, `temp_original_${id}.mp3`);
@@ -93,71 +197,57 @@ async function transcribeAudioFromUrl(url) {
       }
     }
 
-    // const transcripts = [];
     let offset = 0;
     let fullText = '';
     let mergedWords = [];
 
-    if (sourcePath) {
-      const result = await transcribeBuffer(sourcePath);
-      fullText = result.text;
-      for (const segment of result.segments || []) {
+    const processSegments = (segments) => {
+      for (const segment of segments || []) {
         if (Array.isArray(segment.words)) {
-          for (const word of segment.words) {
-            mergedWords.push({
-              word: word.word,
-              start: word.start + offset, 
-              end: word.end + offset
-            });
-          }
+          segment.words.forEach(word => {
+            if (typeof word.word === 'string' && word.start != null && word.end != null) {
+              mergedWords.push({
+                word: word.word,
+                start: word.start + offset,
+                end: word.end + offset,
+              });
+            }
+          });
         }
       }
+    };
+
+    if (sourcePath) {
+      const result = await transcribeBuffer(sourcePath);
+      fullText = result.text || '';
+      processSegments(result.segments);
     } else {
       const chunkFiles = fs.readdirSync(chunkDir).filter(f => f.endsWith('.mp3'));
       for (const file of chunkFiles) {
         const filePath = path.join(chunkDir, file);
         const result = await transcribeBuffer(filePath);
-        fullText += result.text + ' ';
+        fullText += (result.text || '') + ' ';
+        processSegments(result.segments);
 
-      for (const segment of result.segments || []) {
-        if (Array.isArray(segment.words)) {
-          for (const word of segment.words) {
-            mergedWords.push({
-              word: word.word,
-              start: word.start + offset,
-              end: word.end + offset,
-            });
-          }
-        }
-      }
-
-
-        // add real-time offset based on last word
         const lastSegment = result.segments[result.segments.length - 1];
         offset += lastSegment ? lastSegment.end : SEGMENT_DURATION;
-
       }
     }
 
-    // const transcriptJson = mergedWords.map(word => ({
-    //   word: word.word,
-    //   start: word.start,
-    //   end: word.end
-    // }));
+    console.log(" FINAL WORD COUNT:", mergedWords.length);
+    console.log(" First word object:", mergedWords[0]);
+    console.log(" transcriptJson is array?", Array.isArray(mergedWords));
 
-  console.log('FINAL WORD COUNT:', mergedWords.length);
+    return {
+      script: fullText.trim(),
+      transcriptJson: mergedWords
+    };
 
-  return {
-    script: fullText.trim(),
-    transcriptJson: mergedWords
-  };
-    
   } catch (err) {
-    console.error('Transcription error:', err);
+    console.error(' Transcription error:', err);
     throw err;
 
   } finally {
-    // cleanup
     [originalPath, compressedPath].forEach(p => fs.existsSync(p) && fs.unlinkSync(p));
     if (fs.existsSync(chunkDir)) {
       fs.readdirSync(chunkDir).forEach(f => fs.unlinkSync(path.join(chunkDir, f)));

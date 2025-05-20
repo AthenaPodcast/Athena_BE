@@ -246,7 +246,7 @@ exports.generateScript = async (req, res) => {
 // full upload episode (audio, metadata, script with time)
 exports.fullUploadEpisode = async (req, res) => {
   try {
-    const { podcast_id, name, description, release_date } = req.body;
+    const { podcast_id, name, description, release_date, picture_url } = req.body;
     const audioFile = req.file;
 
     if (req.user.type !== 'channel') {
@@ -288,6 +288,11 @@ exports.fullUploadEpisode = async (req, res) => {
 
     // transcribe audio
     const { script, transcriptJson } = await transcribeAudioFromUrl(audioUrl);
+    
+    console.log("transcriptJson PREVIEW:", transcriptJson.slice(0, 3));
+    console.log("total:", transcriptJson.length);
+    console.log("is array?", Array.isArray(transcriptJson));
+
 
     console.log('Saving episode with:', {
       scriptLength: script.length,
@@ -296,30 +301,45 @@ exports.fullUploadEpisode = async (req, res) => {
     });
     
     // save episode to DB
-    const result = await pool.query(
-      `INSERT INTO episodes (podcast_id, name, description, audio_url, release_date, duration, script, transcript_json)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING id`,
-      [podcast_id, name, description, audioUrl, release_date, duration, script, JSON.stringify(transcriptJson)]
-    );
+    console.log("Final transcriptJson count:", transcriptJson.length);
 
+    // const result = await pool.query(
+    //   `INSERT INTO episodes (podcast_id, name, description, audio_url, release_date, duration, script, transcript_json, picture_url)
+    //   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    //   RETURNING id`,
+    //   [podcast_id, name, description, audioUrl, release_date, duration, script, JSON.stringify(transcriptJson), picture_url]
+    // );
+    console.log("transcriptJson preview before insert:", transcriptJson.slice(0, 2));
+    console.log("type:", typeof transcriptJson);
+    console.log("isArray:", Array.isArray(transcriptJson));
+    
+    const episode = await createEpisode({
+      podcast_id,
+      name,
+      description,
+      picture_url,
+      audio_url: audioUrl,
+      duration,
+      script,
+      transcript_json: transcriptJson,
+      release_date
+    });
 
     // clean up 
     if (audioFile.path && fs.existsSync(audioFile.path)) {
       fs.unlinkSync(audioFile.path);
     }
 
-
     res.status(201).json({
       message: 'Episode uploaded and transcribed successfully',
-      episode_id: result.rows[0].id,
-      audio_url: audioUrl,
-      duration,
-      script,
-      transcript_json: transcriptJson,
+      episode_id: episode.id,
+      audio_url: episode.audio_url,
+      duration: episode.duration,
+      script: episode.script,
+      transcript_json: episode.transcript_json,
     });
   } catch (err) {
     console.error('fullUploadEpisode error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 };
