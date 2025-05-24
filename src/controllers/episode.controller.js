@@ -1,17 +1,25 @@
 const pool = require('../../db');
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
-const { createEpisode } = require('../models/episode.model');
-const { getEpisodesByPodcastId } = require('../models/episode.model');
-const { getEpisodeDetails } = require('../models/episode.model');
+const { 
+  createEpisode,
+  getEpisodesByPodcastId,
+  getEpisodeDetails,
+  toggleEpisodeLike, 
+  getEpisodeLike,
+  getLikedEpisodes,
+  countLikedEpisodes,
+  updateEpisodeScript 
+ } = require('../models/episode.model');
+ 
+const { transcribeAudioFromUrl } = require('../utils/transcribe');
+
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
 const axios = require('axios');
 const tmp = require('tmp');
 const fs = require('fs');
-const { toggleEpisodeLike, getEpisodeLike } = require('../models/episode.model');
-const { getLikedEpisodes, countLikedEpisodes } = require('../models/episode.model');
 
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
@@ -211,5 +219,127 @@ exports.getLikedEpisodes = async (req, res) => {
   } catch (err) {
     console.error('Liked episodes fetch error:', err);
     res.status(500).json({ message: 'Failed to fetch liked episodes' });
+  }
+};
+
+exports.generateScript = async (req, res) => {
+  const { episodeId } = req.params;
+
+  try {
+    const result = await pool.query(`SELECT audio_url FROM episodes WHERE id = $1`, [episodeId]);
+    const episode = result.rows[0];
+
+    if (!episode || !episode.audio_url) {
+      return res.status(404).json({ message: 'Episode not found or missing audio_url' });
+    }
+
+    const transcript = await transcribeAudioFromUrl(episode.audio_url);
+    const updatedEpisode = await updateEpisodeScript(episodeId, transcript);
+
+    res.status(200).json({ message: 'Script generated', script: updatedEpisode.script });
+  } catch (err) {
+    console.error('Transcription error:', err);
+    res.status(500).json({ message: 'Failed to generate script' });
+  }
+};
+
+// full upload episode (audio, metadata, script with time)
+exports.fullUploadEpisode = async (req, res) => {
+  try {
+    const { podcast_id, name, description, release_date, picture_url } = req.body;
+    const audioFile = req.file;
+
+    if (req.user.type !== 'channel') {
+      return res.status(403).json({ error: 'Only channel accounts can upload episodes' });
+    }
+
+    if (!audioFile) return res.status(400).json({ error: 'Audio file is required' });
+
+    // upload audio to cloudinary
+    const streamUpload = (fileBuffer) => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'video',
+            folder: 'episods',
+          },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+        
+        stream.end(fileBuffer);
+      });
+    };
+    
+    const uploadResult = await streamUpload(audioFile.buffer);
+
+
+    const audioUrl = uploadResult.secure_url;
+
+    // extract duration of audio with FFmpeg
+    const duration = await new Promise((resolve, reject) => {
+      ffmpeg.ffprobe(audioUrl, (err, metadata) => {
+        if (err) return reject(err);
+        resolve(Math.floor(metadata.format.duration));
+      });
+    });
+
+    // transcribe audio
+    const { script, transcriptJson } = await transcribeAudioFromUrl(audioUrl);
+    
+    console.log("transcriptJson PREVIEW:", transcriptJson.slice(0, 3));
+    console.log("total:", transcriptJson.length);
+    console.log("is array?", Array.isArray(transcriptJson));
+
+
+    console.log('Saving episode with:', {
+      scriptLength: script.length,
+      wordCount: transcriptJson.length,
+      firstWord: transcriptJson[0],
+    });
+    
+    // save episode to DB
+    console.log("Final transcriptJson count:", transcriptJson.length);
+
+    // const result = await pool.query(
+    //   `INSERT INTO episodes (podcast_id, name, description, audio_url, release_date, duration, script, transcript_json, picture_url)
+    //   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    //   RETURNING id`,
+    //   [podcast_id, name, description, audioUrl, release_date, duration, script, JSON.stringify(transcriptJson), picture_url]
+    // );
+    console.log("transcriptJson preview before insert:", transcriptJson.slice(0, 2));
+    console.log("type:", typeof transcriptJson);
+    console.log("isArray:", Array.isArray(transcriptJson));
+    
+    const episode = await createEpisode({
+      podcast_id,
+      name,
+      description,
+      picture_url,
+      audio_url: audioUrl,
+      duration,
+      script,
+      transcript_json: transcriptJson,
+      release_date
+    });
+
+    // clean up 
+    if (audioFile.path && fs.existsSync(audioFile.path)) {
+      fs.unlinkSync(audioFile.path);
+    }
+
+    res.status(201).json({
+      message: 'Episode uploaded and transcribed successfully',
+      episode_id: episode.id,
+      audio_url: episode.audio_url,
+      duration: episode.duration,
+      script: episode.script,
+      transcript_json: episode.transcript_json,
+    });
+  } catch (err) {
+    console.error('fullUploadEpisode error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 };

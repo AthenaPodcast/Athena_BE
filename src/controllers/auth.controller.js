@@ -69,15 +69,15 @@ const signup = async (req, res) => {
         `,
       });
     } catch (emailErr) {
-      console.error('❌ Failed to send verification email:', emailErr);
+      console.error('Failed to send verification email:', emailErr);
       return res.status(500).json({ message: 'Signup succeeded, but failed to send verification email.' });
     }
 
-    console.log('✅ Signup completed successfully');
+    console.log('Signup completed successfully');
     res.status(201).json({ message: 'Account created. Please check your email to verify.' });
 
   } catch (error) {
-    console.error('❌ Signup error:', error.stack);
+    console.error('Signup error:', error.stack);
     res.status(500).json({ message: 'Server error during signup' });
   }
 };
