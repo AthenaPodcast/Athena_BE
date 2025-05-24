@@ -9,25 +9,61 @@ const createEpisode = async (episodeData) => {
     audio_url,
     duration,
     script,
+    transcript_json,
     release_date,
   } = episodeData;
+
+    // Ensure transcript_json is a proper array and not undefined
+  const safeTranscriptJson = Array.isArray(transcript_json) ? transcript_json : [];
+  
+  // Validate transcript_json structure
+  const validTranscriptJson = safeTranscriptJson.map(word => {
+    // Make sure each word has the required properties
+    return {
+      word: String(word.word || ''),
+      start: Number(word.start || 0),
+      end: Number(word.end || 0)
+    };
+  });
+  
+  console.log('Processing transcript with', validTranscriptJson.length, 'words');
+  
+  // Explicitly stringify the JSON to ensure correct format
+  const jsonString = JSON.stringify(validTranscriptJson);
 
   const query = `
     INSERT INTO episodes (
       podcast_id, name, description, picture_url,
-      audio_url, duration, script, release_date
+      audio_url, duration, script, transcript_json, release_date
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
     RETURNING *;
   `;
 
   const values = [
     podcast_id, name, description, picture_url,
-    audio_url, duration, script, release_date
+    audio_url, duration, script, jsonString, release_date
   ];
 
-  const result = await pool.query(query, values);
-  return result.rows[0];
+  // const result = await pool.query(query, values);
+  // return result.rows[0];
+
+  try {
+    const result = await pool.query(query, values);
+    
+    // Verify the transcript_json was properly inserted
+    if (result.rows[0] && result.rows[0].transcript_json) {
+      console.log('Inserted transcript length:', 
+                  Array.isArray(result.rows[0].transcript_json) 
+                    ? result.rows[0].transcript_json.length 
+                    : 'Not an array');
+    }
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error in createEpisode:', error);
+    throw error;
+  }
 };
 
 // Get all episodes for a given podcast ID
@@ -133,6 +169,14 @@ const countLikedEpisodes = async (accountId) => {
   return parseInt(result.rows[0].count);
 };
 
+// episode script
+const updateEpisodeScript = async (episodeId, scriptText) => {
+  const query = `UPDATE episodes SET script = $1 WHERE id = $2 RETURNING *`;
+  const values = [scriptText, episodeId];
+  const result = await pool.query(query, values);
+  return result.rows[0];
+};
+
 module.exports = {
   createEpisode,
   getEpisodesByPodcastId,
@@ -140,5 +184,6 @@ module.exports = {
   toggleEpisodeLike,
   getEpisodeLike,
   getLikedEpisodes,
-  countLikedEpisodes
+  countLikedEpisodes,
+  updateEpisodeScript
 };
