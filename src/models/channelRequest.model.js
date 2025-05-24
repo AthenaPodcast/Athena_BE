@@ -50,11 +50,30 @@ const hasExistingRequest = async (accountId) => {
   return result.rows.length > 0;
 };
 
+const getAllRequestsGrouped = async () => {
+  const statuses = ['pending', 'approved', 'rejected'];
+  const grouped = {};
+
+  for (let status of statuses) {
+    const result = await pool.query(
+      `SELECT cr.*, a.email, a.account_type
+       FROM channel_requests cr
+       JOIN accounts a ON cr.account_id = a.id
+       WHERE cr.status = $1
+       ORDER BY cr.requested_at DESC`,
+      [status]
+    );
+    grouped[status] = result.rows;
+  }
+
+  return grouped;
+};
 
 module.exports = {
   submitChannelRequest,
   getPendingRequests,
   updateRequestStatus,
   updateAccountToChannel,
-  hasExistingRequest
+  hasExistingRequest,
+  getAllRequestsGrouped
 };

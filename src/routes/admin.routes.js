@@ -5,12 +5,14 @@ const adminOnly = require('../middlewares/adminOnly.middleware');
 const {
   getChannelRequests,
   approveRequest,
-  rejectRequest
+  rejectRequest,
+  getAllChannelRequests
 } = require('../controllers/admin.controller');
 
 router.use(verifyToken, adminOnly);
 
 router.get('/channel-requests', getChannelRequests);
+router.get('/all-channel-requests', getAllChannelRequests);
 router.post('/channel-requests/:id/approve', approveRequest);
 router.post('/channel-requests/:id/reject', rejectRequest);
 

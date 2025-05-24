@@ -3,7 +3,8 @@ const pool = require('../../db');
 const {
   getPendingRequests,
   updateRequestStatus,
-  updateAccountToChannel
+  updateAccountToChannel,
+  getAllRequestsGrouped 
 } = require('../models/channelRequest.model');
 
 const getChannelRequests = async (req, res) => {
@@ -36,8 +37,14 @@ const rejectRequest = async (req, res) => {
   res.status(404).json({ message: 'Request not found' });
 };
 
+const getAllChannelRequests = async (req, res) => {
+  const result = await getAllRequestsGrouped();
+  res.json(result);
+};
+
 module.exports = {
   getChannelRequests,
   approveRequest,
-  rejectRequest
+  rejectRequest,
+  getAllChannelRequests
 };
