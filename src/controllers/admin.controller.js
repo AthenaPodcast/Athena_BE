@@ -384,6 +384,81 @@ const getPodcastDetails = async (req, res) => {
   }
 };
 
+const getEpisodeDetails = async (req, res) => {
+  const episodeId = req.params.id;
+
+  try {
+    // basic episode info with podcast + channel name
+    const episodeRes = await pool.query(
+      `SELECT e.name AS episode_name, e.description, e.duration, e.picture_url,
+              p.name AS podcast_name, cp.channel_name
+       FROM episodes e
+       LEFT JOIN podcasts p ON e.podcast_id = p.id
+       LEFT JOIN accounts a ON p.channel_account_id = a.id
+       LEFT JOIN channelprofile cp ON cp.account_id = a.id
+       WHERE e.id = $1`,
+      [episodeId]
+    );
+
+    if (episodeRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Episode not found' });
+    }
+
+    const episode = episodeRes.rows[0];
+
+    // like count
+    const likeRes = await pool.query(
+      `SELECT COUNT(*) FROM episode_likes
+       WHERE episode_id = $1 AND liked = true`,
+      [episodeId]
+    );
+    const like_count = parseInt(likeRes.rows[0].count);
+
+    // reviews + reviewer name
+    const reviewRes = await pool.query(
+      `SELECT r.rating, r.comment_text, r.created_at,
+              CONCAT(u.first_name, ' ', u.last_name) AS user_name
+       FROM reviews r
+       JOIN accounts a ON r.account_id = a.id
+       JOIN userprofile u ON a.id = u.account_id
+       WHERE r.episode_id = $1
+       ORDER BY r.created_at DESC`,
+      [episodeId]
+    );
+
+    const reviews = reviewRes.rows.map(r => ({
+      user_name: r.user_name,
+      rating: r.rating,
+      comment: r.comment_text,
+      created_at: r.created_at
+    }));
+
+    // format duration (seconds → h:m:s)
+    const durationSec = episode.duration || 0;
+    const hours = String(Math.floor(durationSec / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((durationSec % 3600) / 60)).padStart(2, '0');
+    const seconds = String(durationSec % 60).padStart(2, '0');
+    const durationFormatted = `${hours}:${minutes}:${seconds}`;
+
+    // final response
+    return res.json({
+      episode_name: episode.episode_name,
+      podcast_name: episode.podcast_name,
+      channel_name: episode.channel_name,
+      description: episode.description,
+      duration: durationFormatted,
+      picture_url: episode.picture_url,
+      like_count,
+      reviews
+    });
+
+  } catch (err) {
+    console.error('Error in getEpisodeDetails:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+
 module.exports = {
   getChannelRequests,
   approveRequest,
@@ -395,5 +470,6 @@ module.exports = {
   getAllEpisodes,
   getUserDetails,
   getChannelDetails,
-  getPodcastDetails
+  getPodcastDetails,
+  getEpisodeDetails
 };
