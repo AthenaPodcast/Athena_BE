@@ -566,6 +566,54 @@ const deleteChannel = async (req, res) => {
   }
 };
 
+const deletePodcast = async (req, res) => {
+  const podcastId = req.params.id;
+
+  try {
+    // check if podcast exists
+    const checkRes = await pool.query(
+      `SELECT id FROM podcasts WHERE id = $1`,
+      [podcastId]
+    );
+
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Podcast not found' });
+    }
+
+    // get all episodes in the podcast
+    const episodeRes = await pool.query(
+      `SELECT id FROM episodes WHERE podcast_id = $1`,
+      [podcastId]
+    );
+    const episodeIds = episodeRes.rows.map(row => row.id);
+
+    // delete episode linked data
+    for (const episodeId of episodeIds) {
+      await pool.query(`DELETE FROM episode_likes WHERE episode_id = $1`, [episodeId]);
+      await pool.query(`DELETE FROM reviews WHERE episode_id = $1`, [episodeId]);
+      await pool.query(`DELETE FROM recentlyplayed WHERE episode_id = $1`, [episodeId]);
+    }
+
+    // delete episodes
+    if (episodeIds.length > 0) {
+      await pool.query(`DELETE FROM episodes WHERE id = ANY($1)`, [episodeIds]);
+    }
+
+    // delete podcast saves and categories
+    await pool.query(`DELETE FROM podcast_saves WHERE podcast_id = $1`, [podcastId]);
+    await pool.query(`DELETE FROM podcastcategory WHERE podcast_id = $1`, [podcastId]);
+
+    // delete the podcast itself
+    await pool.query(`DELETE FROM podcasts WHERE id = $1`, [podcastId]);
+
+    res.json({ message: 'Podcast and all related data deleted successfully' });
+
+  } catch (err) {
+    console.error('Error in deletePodcast:', err);
+    res.status(500).json({ message: 'Failed to delete podcast', error: err.message });
+  }
+};
+
 module.exports = {
   getChannelRequests,
   approveRequest,
@@ -580,5 +628,6 @@ module.exports = {
   getPodcastDetails,
   getEpisodeDetails,
   deleteUser,
-  deleteChannel
+  deleteChannel,
+  deletePodcast
 };

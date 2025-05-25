@@ -16,7 +16,8 @@ const {
   getPodcastDetails,
   getEpisodeDetails,
   deleteUser,
-  deleteChannel
+  deleteChannel,
+  deletePodcast
 } = require('../controllers/admin.controller');
 
 router.use(verifyToken, adminOnly);
@@ -34,6 +35,7 @@ router.get('/episode/:id', getEpisodeDetails);
 
 router.delete('/user/:id', deleteUser);
 router.delete('/channel/:id', deleteChannel);
+router.delete('/podcast/:id', deletePodcast);
 
 router.post('/channel-requests/:id/approve', approveRequest);
 router.post('/channel-requests/:id/reject', rejectRequest);
