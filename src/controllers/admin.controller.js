@@ -59,7 +59,6 @@ const getAllUsers = async (req, res) => {
   res.json(result.rows);
 };
 
-
 const getAllChannels = async (req, res) => {
   const result = await pool.query(
     `SELECT 
@@ -77,7 +76,6 @@ const getAllChannels = async (req, res) => {
   );
   res.json(result.rows);
 };
-
 
 const getAllPodcasts = async (req, res) => {
   const result = await pool.query(
@@ -147,6 +145,119 @@ const getAllEpisodes = async (req, res) => {
   res.json(grouped);
 };
 
+const getUserDetails = async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    // basic user's info
+    const basicInfoResult = await pool.query(
+      `SELECT a.email, a.phone, u.first_name, u.last_name, u.gender, u.age, u.profile_picture
+       FROM accounts a
+       JOIN userprofile u ON a.id = u.account_id
+       WHERE a.id = $1`,
+      [userId]
+    );
+
+    if (basicInfoResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const basicInfo = basicInfoResult.rows[0];
+    const fullName = `${basicInfo.first_name} ${basicInfo.last_name}`;
+
+    // saved podcasts
+    const savedResult = await pool.query(
+      `SELECT p.name FROM podcast_saves ps
+       JOIN podcasts p ON ps.podcast_id = p.id
+       WHERE ps.account_id = $1 AND ps.saved = true`,
+      [userId]
+    );
+    const savedPodcasts = savedResult.rows.map(r => r.name);
+
+    // liked episodes
+    const likedResult = await pool.query(
+      `SELECT e.name FROM episode_likes el
+       JOIN episodes e ON el.episode_id = e.id
+       WHERE el.account_id = $1 AND el.liked = true`,
+      [userId]
+    );
+    const likedEpisodes = likedResult.rows.map(r => r.name);
+
+    // reviews
+    const reviewResult = await pool.query(
+      `SELECT r.comment_text, r.rating, r.created_at, e.name AS episode_name
+       FROM reviews r
+       JOIN episodes e ON r.episode_id = e.id
+       WHERE r.account_id = $1`,
+      [userId]
+    );
+
+    // listening time + category percentage breakdown
+    const playedResult = await pool.query(
+      `SELECT r.progress, e.duration, pc.category_id, cat.name AS category_name
+       FROM recentlyplayed r
+       JOIN episodes e ON r.episode_id = e.id
+       JOIN podcasts p ON e.podcast_id = p.id
+       JOIN podcastcategory pc ON pc.podcast_id = p.id
+       JOIN categories cat ON pc.category_id = cat.id
+       WHERE r.account_id = $1`,
+      [userId]
+    );
+
+    let totalSeconds = 0;
+    const categoryDurations = {}; // { categoryName: seconds }
+
+    playedResult.rows.forEach(row => {
+      const time = Math.min(row.progress, row.duration || row.progress || 0);
+      totalSeconds += time;
+
+      // divide by category count later
+      const key = row.category_name;
+      if (!categoryDurations[key]) categoryDurations[key] = 0;
+      categoryDurations[key] += time;
+    });
+
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const listening_time = `${hours}h ${minutes}m`;
+
+    // category percentages
+    const category_breakdown = {};
+    Object.entries(categoryDurations).forEach(([cat, sec]) => {
+      const percent = ((sec / totalSeconds) * 100).toFixed(1);
+      category_breakdown[cat] = `${percent}%`;
+    });
+
+    // final response
+    return res.json({
+      basic_info: {
+        email: basicInfo.email,
+        phone: basicInfo.phone,
+        name: fullName,
+        gender: basicInfo.gender,
+        age: basicInfo.age,
+        profile_picture: basicInfo.profile_picture
+      },
+      saved_podcasts: {
+        count: savedPodcasts.length,
+        list: savedPodcasts
+      },
+      liked_episodes: {
+        count: likedEpisodes.length,
+        list: likedEpisodes
+      },
+      reviews: reviewResult.rows,
+      listening_time,
+      category_breakdown
+    });
+
+  } catch (err) {
+    console.error('Error in getUserDetails:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 
 module.exports = {
   getChannelRequests,
@@ -156,5 +267,6 @@ module.exports = {
   getAllUsers,
   getAllChannels,
   getAllPodcasts,
-  getAllEpisodes
+  getAllEpisodes,
+  getUserDetails
 };
