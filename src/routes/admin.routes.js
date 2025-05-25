@@ -12,7 +12,8 @@ const {
   getAllPodcasts,
   getAllEpisodes,
   getUserDetails,
-  getChannelDetails
+  getChannelDetails,
+  getPodcastDetails
 } = require('../controllers/admin.controller');
 
 router.use(verifyToken, adminOnly);
@@ -25,6 +26,7 @@ router.get('/podcasts', getAllPodcasts);
 router.get('/episodes', getAllEpisodes);
 router.get('/user/:id', getUserDetails);
 router.get('/channel/:id', getChannelDetails);
+router.get('/podcast/:id', getPodcastDetails);
 
 router.post('/channel-requests/:id/approve', approveRequest);
 router.post('/channel-requests/:id/reject', rejectRequest);

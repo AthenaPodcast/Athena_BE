@@ -318,6 +318,71 @@ const getChannelDetails = async (req, res) => {
   }
 };
 
+const getPodcastDetails = async (req, res) => {
+  const podcastId = req.params.id;
+
+  try {
+    // basic podcast info + channel name
+    const podcastRes = await pool.query(
+      `SELECT p.name AS podcast_name, p.description, p.language, p.picture_url,
+              cp.channel_name
+       FROM podcasts p
+       JOIN accounts a ON p.channel_account_id = a.id
+       JOIN channelprofile cp ON cp.account_id = a.id
+       WHERE p.id = $1`,
+      [podcastId]
+    );
+
+    if (podcastRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Podcast not found' });
+    }
+
+    const podcast = podcastRes.rows[0];
+
+    // get categories
+    const categoryRes = await pool.query(
+      `SELECT c.name FROM podcastcategory pc
+       JOIN categories c ON pc.category_id = c.id
+       WHERE pc.podcast_id = $1`,
+      [podcastId]
+    );
+    const categories = categoryRes.rows.map(r => r.name);
+
+    // get episodes
+    const episodeRes = await pool.query(
+      `SELECT name FROM episodes
+       WHERE podcast_id = $1
+       ORDER BY created_at ASC`,
+      [podcastId]
+    );
+    const episodes = episodeRes.rows.map(r => r.name);
+
+    // get saved count
+    const saveRes = await pool.query(
+      `SELECT COUNT(*) FROM podcast_saves
+       WHERE podcast_id = $1 AND saved = true`,
+      [podcastId]
+    );
+    const saved_count = parseInt(saveRes.rows[0].count);
+
+    // final response
+    return res.json({
+      podcast_name: podcast.podcast_name,
+      channel_name: podcast.channel_name,
+      description: podcast.description,
+      language: podcast.language,
+      picture_url: podcast.picture_url,
+      categories,
+      episode_count: episodes.length,
+      episodes,
+      saved_count
+    });
+
+  } catch (err) {
+    console.error('Error in getPodcastDetails:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
 
 module.exports = {
   getChannelRequests,
@@ -329,5 +394,6 @@ module.exports = {
   getAllPodcasts,
   getAllEpisodes,
   getUserDetails,
-  getChannelDetails
+  getChannelDetails,
+  getPodcastDetails
 };
