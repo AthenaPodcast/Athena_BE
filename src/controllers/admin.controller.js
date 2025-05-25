@@ -614,6 +614,36 @@ const deletePodcast = async (req, res) => {
   }
 };
 
+const deleteEpisode = async (req, res) => {
+  const episodeId = req.params.id;
+
+  try {
+    // check if episode exists
+    const checkRes = await pool.query(
+      `SELECT id FROM episodes WHERE id = $1`,
+      [episodeId]
+    );
+
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Episode not found' });
+    }
+
+    // delete related data
+    await pool.query(`DELETE FROM episode_likes WHERE episode_id = $1`, [episodeId]);
+    await pool.query(`DELETE FROM reviews WHERE episode_id = $1`, [episodeId]);
+    await pool.query(`DELETE FROM recentlyplayed WHERE episode_id = $1`, [episodeId]);
+
+    // delete the episode
+    await pool.query(`DELETE FROM episodes WHERE id = $1`, [episodeId]);
+
+    res.json({ message: 'Episode and related data deleted successfully' });
+
+  } catch (err) {
+    console.error('Error in deleteEpisode:', err);
+    res.status(500).json({ message: 'Failed to delete episode', error: err.message });
+  }
+};
+
 module.exports = {
   getChannelRequests,
   approveRequest,
@@ -629,5 +659,6 @@ module.exports = {
   getEpisodeDetails,
   deleteUser,
   deleteChannel,
-  deletePodcast
+  deletePodcast,
+  deleteEpisode
 };
