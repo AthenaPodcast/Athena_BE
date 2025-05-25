@@ -458,6 +458,41 @@ const getEpisodeDetails = async (req, res) => {
   }
 };
 
+const deleteUser = async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+
+    const existsRes = await pool.query(
+      `SELECT id FROM accounts WHERE id = $1 AND account_type = 'regular'`,
+      [userId]
+    );
+
+    if (existsRes.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found or not a regular account' });
+    }
+    
+    // delete from episode_likes, podcast_saves, reviews, recentlyplayed, moodtracker, notifications, userinterests, userprofile
+    await pool.query(`DELETE FROM episode_likes WHERE account_id = $1`, [userId]);
+    await pool.query(`DELETE FROM podcast_saves WHERE account_id = $1`, [userId]);
+    await pool.query(`DELETE FROM reviews WHERE account_id = $1`, [userId]);
+    await pool.query(`DELETE FROM recentlyplayed WHERE account_id = $1`, [userId]);
+    await pool.query(`DELETE FROM moodtracker WHERE account_id = $1`, [userId]);
+    await pool.query(`DELETE FROM notifications WHERE account_id = $1`, [userId]);
+    await pool.query(`DELETE FROM userinterests WHERE account_id = $1`, [userId]);
+    await pool.query(`DELETE FROM userprofile WHERE account_id = $1`, [userId]);
+
+    // finally delete the user account
+    await pool.query(`DELETE FROM accounts WHERE id = $1`, [userId]);
+
+    res.json({ message: 'User account deleted successfully' });
+
+  } catch (err) {
+    console.error('Error in deleteUser:', err);
+    res.status(500).json({ message: 'Failed to delete user', error: err.message });
+  }
+};
+
 
 module.exports = {
   getChannelRequests,
@@ -471,5 +506,6 @@ module.exports = {
   getUserDetails,
   getChannelDetails,
   getPodcastDetails,
-  getEpisodeDetails
+  getEpisodeDetails,
+  deleteUser
 };
