@@ -493,6 +493,78 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const deleteChannel = async (req, res) => {
+  const channelId = req.params.id;
+
+  try {
+    // confirm it's a channel account
+    const checkRes = await pool.query(
+      `SELECT id FROM accounts WHERE id = $1 AND account_type = 'channel'`,
+      [channelId]
+    );
+
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Channel not found or not a channel account' });
+    }
+
+    // get podcast IDs created by this channel
+    const podcastRes = await pool.query(
+      `SELECT id FROM podcasts WHERE channel_account_id = $1`,
+      [channelId]
+    );
+    const podcastIds = podcastRes.rows.map(row => row.id);
+
+    // get episode IDs from those podcasts
+    let episodeIds = [];
+    if (podcastIds.length > 0) {
+      const episodeRes = await pool.query(
+        `SELECT id FROM episodes WHERE podcast_id = ANY($1)`,
+        [podcastIds]
+      );
+      episodeIds = episodeRes.rows.map(row => row.id);
+    }
+
+    // delete all episode related data
+    for (const episodeId of episodeIds) {
+      await pool.query(`DELETE FROM episode_likes WHERE episode_id = $1`, [episodeId]);
+      await pool.query(`DELETE FROM reviews WHERE episode_id = $1`, [episodeId]);
+      await pool.query(`DELETE FROM recentlyplayed WHERE episode_id = $1`, [episodeId]);
+    }
+
+    // delete all episodes
+    if (episodeIds.length > 0) {
+      await pool.query(`DELETE FROM episodes WHERE id = ANY($1)`, [episodeIds]);
+    }
+
+    // delete all podcast related data
+    for (const podcastId of podcastIds) {
+      await pool.query(`DELETE FROM podcastcategory WHERE podcast_id = $1`, [podcastId]);
+      await pool.query(`DELETE FROM podcast_saves WHERE podcast_id = $1`, [podcastId]);
+    }
+
+    if (podcastIds.length > 0) {
+      await pool.query(`DELETE FROM podcasts WHERE id = ANY($1)`, [podcastIds]);
+    }
+
+    // delete channelprofile
+    await pool.query(`DELETE FROM channelprofile WHERE account_id = $1`, [channelId]);
+
+    // delete userprofile (user info)
+    await pool.query(`DELETE FROM userprofile WHERE account_id = $1`, [channelId]);
+
+    // delete any channel request made by this user
+    await pool.query(`DELETE FROM channel_requests WHERE account_id = $1`, [channelId]);
+
+    // delete the account itself
+    await pool.query(`DELETE FROM accounts WHERE id = $1`, [channelId]);
+
+    res.json({ message: 'Channel and all related data deleted successfully' });
+
+  } catch (err) {
+    console.error('Error in deleteChannel:', err);
+    res.status(500).json({ message: 'Failed to delete channel', error: err.message });
+  }
+};
 
 module.exports = {
   getChannelRequests,
@@ -507,5 +579,6 @@ module.exports = {
   getChannelDetails,
   getPodcastDetails,
   getEpisodeDetails,
-  deleteUser
+  deleteUser,
+  deleteChannel
 };
