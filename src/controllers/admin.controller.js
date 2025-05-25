@@ -258,6 +258,66 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+const getChannelDetails = async (req, res) => {
+  const accountId = req.params.id;
+
+  try {
+    // basic channel info
+    const channelRes = await pool.query(
+      `SELECT c.channel_name, c.channel_description, c.channel_picture, a.created_at
+       FROM channelprofile c
+       JOIN accounts a ON a.id = c.account_id
+       WHERE c.account_id = $1 AND a.account_type = 'channel'`,
+      [accountId]
+    );
+
+    if (channelRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Channel not found or not a channel account' });
+    }
+
+    const channel = channelRes.rows[0];
+
+    // podcasts + languages + episode count
+    const podcastsRes = await pool.query(
+      `SELECT p.id, p.name, p.language
+       FROM podcasts p
+       WHERE p.channel_account_id = $1`,
+      [accountId]
+    );
+
+    const podcasts = podcastsRes.rows;
+    const podcastNames = podcasts.map(p => p.name);
+    const languages = [...new Set(podcasts.map(p => p.language))];
+    const podcastIds = podcasts.map(p => p.id);
+
+    // episode count
+    let episodeCount = 0;
+    if (podcastIds.length > 0) {
+      const episodeRes = await pool.query(
+        `SELECT COUNT(*) FROM episodes WHERE podcast_id = ANY($1)`,
+        [podcastIds]
+      );
+      episodeCount = parseInt(episodeRes.rows[0].count);
+    }
+
+    // final response
+    return res.json({
+      channel_name: channel.channel_name,
+      channel_picture: channel.channel_picture,
+      description: channel.channel_description,
+      podcast_count: podcasts.length,
+      podcasts: podcastNames,
+      episode_count: episodeCount,
+      languages,
+      joined_at: channel.created_at
+    });
+
+  } catch (err) {
+    console.error('Error in getChannelDetails:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 
 module.exports = {
   getChannelRequests,
@@ -268,5 +328,6 @@ module.exports = {
   getAllChannels,
   getAllPodcasts,
   getAllEpisodes,
-  getUserDetails
+  getUserDetails,
+  getChannelDetails
 };
