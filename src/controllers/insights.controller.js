@@ -239,6 +239,79 @@ const getInsightsSummary = async (req, res) => {
   }
 };
 
+const getDashboardSummary = async (req, res) => {
+  try {
+    // total counts
+    const [users, channels, podcasts, episodes] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM accounts WHERE account_type = 'regular'`),
+      pool.query(`SELECT COUNT(*) FROM accounts WHERE account_type = 'channel'`),
+      pool.query(`SELECT COUNT(*) FROM podcasts`),
+      pool.query(`SELECT COUNT(*) FROM episodes`)
+    ]);
+
+    // total listening hours
+    const totalTime = await pool.query(
+      `SELECT FLOOR(SUM(progress) / 3600) AS total_hours FROM recentlyplayed`
+    );
+
+    // most liked episode
+    const mostLiked = await pool.query(
+      `SELECT e.id, e.name, COUNT(el.*) AS like_count
+       FROM episode_likes el
+       JOIN episodes e ON el.episode_id = e.id
+       WHERE el.liked = true
+       GROUP BY e.id, e.name
+       ORDER BY like_count DESC
+       LIMIT 1`
+    );
+
+    // top listener
+    const topListener = await pool.query(
+      `SELECT rp.account_id,
+              CONCAT(up.first_name, ' ', up.last_name) AS user_name,
+              FLOOR(SUM(rp.progress) / 60) AS total_minutes
+       FROM recentlyplayed rp
+       JOIN userprofile up ON rp.account_id = up.account_id
+       GROUP BY rp.account_id, user_name
+       ORDER BY total_minutes DESC
+       LIMIT 1`
+    );
+
+    // top category
+    const topCategory = await pool.query(
+      `SELECT c.name AS category_name,
+              FLOOR(SUM(rp.progress) / 60) AS total_minutes
+       FROM recentlyplayed rp
+       JOIN episodes e ON rp.episode_id = e.id
+       JOIN podcasts p ON e.podcast_id = p.id
+       JOIN podcastcategory pc ON pc.podcast_id = p.id
+       JOIN categories c ON pc.category_id = c.id
+       GROUP BY c.name
+       ORDER BY total_minutes DESC
+       LIMIT 1`
+    );
+
+    res.json({
+      totals: {
+        users: parseInt(users.rows[0].count),
+        channels: parseInt(channels.rows[0].count),
+        podcasts: parseInt(podcasts.rows[0].count),
+        episodes: parseInt(episodes.rows[0].count),
+        listening_hours: parseInt(totalTime.rows[0].total_hours || 0)
+      },
+      highlights: {
+        most_liked_episode: mostLiked.rows[0] || null,
+        top_listener: topListener.rows[0] || null,
+        top_category: topCategory.rows[0] || null
+      }
+    });
+
+  } catch (err) {
+    console.error('Error in getDashboardSummary:', err);
+    res.status(500).json({ message: 'Failed to load dashboard summary', error: err.message });
+  }
+};
+
 
 module.exports = {
     getMostLikedEpisodes,
@@ -251,5 +324,6 @@ module.exports = {
     getInactiveUsers,
     getNewUsers,
     getNewEpisodes,
-    getInsightsSummary 
+    getInsightsSummary,
+    getDashboardSummary 
 };

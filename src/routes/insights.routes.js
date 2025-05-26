@@ -13,7 +13,8 @@ const {
   getInactiveUsers,
   getNewUsers,
   getNewEpisodes,
-  getInsightsSummary
+  getInsightsSummary,
+  getDashboardSummary
 } = require('../controllers/insights.controller');
 
 router.use(verifyToken, adminOnly);
@@ -29,6 +30,8 @@ router.get('/inactive-users', getInactiveUsers);
 router.get('/new-users', getNewUsers);
 router.get('/new-episodes', getNewEpisodes);
 router.get('/summary', getInsightsSummary);
+router.get('/dashboard', getDashboardSummary);
+
 
 
 module.exports = router;
