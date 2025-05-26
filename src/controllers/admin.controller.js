@@ -644,6 +644,40 @@ const deleteEpisode = async (req, res) => {
   }
 };
 
+const getChannelOwnerSummary = async (req, res) => {
+  const channelId = req.params.id;
+
+  try {
+    // join channel → userprofile to get gender, age, name
+    const result = await pool.query(
+      `SELECT u.first_name, u.last_name, u.gender, u.age
+       FROM accounts a
+       JOIN userprofile u ON a.id = u.account_id
+       WHERE a.id = $1 AND a.account_type = 'channel'`,
+      [channelId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Channel or user profile not found' });
+    }
+
+    const { first_name, last_name, gender, age } = result.rows[0];
+    if (!gender || !age || !first_name || !last_name) {
+      return res.status(400).json({ message: 'Owner profile is incomplete for this channel.' });
+    }
+
+    const fullName = `${first_name} ${last_name}`;
+    const sentence = `This channel was created by a ${age}-year-old ${gender.toLowerCase()} named ${fullName}`;
+
+    res.json({ summary: sentence });
+
+  } catch (err) {
+    console.error('Error in getChannelOwnerSummary:', err);
+    res.status(500).json({ message: 'Failed to get channel owner summary', error: err.message });
+  }
+};
+
+
 module.exports = {
   getChannelRequests,
   approveRequest,
@@ -660,5 +694,6 @@ module.exports = {
   deleteUser,
   deleteChannel,
   deletePodcast,
-  deleteEpisode
+  deleteEpisode,
+  getChannelOwnerSummary
 };
