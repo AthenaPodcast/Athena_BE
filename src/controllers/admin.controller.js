@@ -406,6 +406,17 @@ const getEpisodeDetails = async (req, res) => {
 
     const episode = episodeRes.rows[0];
 
+    // speakers
+    const speakerRes = await pool.query(
+      `SELECT s.name
+      FROM episode_speakers es
+      JOIN speakers s ON es.speaker_id = s.id
+      WHERE es.episode_id = $1`,
+      [episodeId]
+    );
+
+    const speakers = speakerRes.rows.map(row => row.name);
+
     // like count
     const likeRes = await pool.query(
       `SELECT COUNT(*) FROM episode_likes
@@ -425,6 +436,14 @@ const getEpisodeDetails = async (req, res) => {
        ORDER BY r.created_at DESC`,
       [episodeId]
     );
+    
+    // avg rating
+    const avgRes = await pool.query(
+      `SELECT AVG(rating) AS avg FROM reviews WHERE episode_id = $1`,
+      [episodeId]
+    );
+    const avg_rating = avgRes.rows[0].avg ? parseFloat(avgRes.rows[0].avg).toFixed(1) : null;
+
 
     const reviews = reviewRes.rows.map(r => ({
       user_name: r.user_name,
@@ -445,10 +464,12 @@ const getEpisodeDetails = async (req, res) => {
       episode_name: episode.episode_name,
       podcast_name: episode.podcast_name,
       channel_name: episode.channel_name,
+      speakers,
       description: episode.description,
       duration: durationFormatted,
       picture_url: episode.picture_url,
       like_count,
+      avg_rating,
       reviews
     });
 

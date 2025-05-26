@@ -246,7 +246,7 @@ exports.generateScript = async (req, res) => {
 // full upload episode (audio, metadata, script with time)
 exports.fullUploadEpisode = async (req, res) => {
   try {
-    const { podcast_id, name, description, release_date, picture_url } = req.body;
+    let { podcast_id, name, description, release_date, picture_url, speakers } = req.body;
     const audioFile = req.file;
 
     if (req.user.type !== 'channel') {
@@ -254,6 +254,13 @@ exports.fullUploadEpisode = async (req, res) => {
     }
 
     if (!audioFile) return res.status(400).json({ error: 'Audio file is required' });
+    
+    if (typeof speakers === 'string') {
+      speakers = speakers.split(',').map(name => name.trim()).filter(name => name.length > 0);
+    }
+    if (!Array.isArray(speakers)) {
+      speakers = [];
+    }
 
     // upload audio to cloudinary
     const streamUpload = (fileBuffer) => {
@@ -274,8 +281,6 @@ exports.fullUploadEpisode = async (req, res) => {
     };
     
     const uploadResult = await streamUpload(audioFile.buffer);
-
-
     const audioUrl = uploadResult.secure_url;
 
     // extract duration of audio with FFmpeg
@@ -324,6 +329,32 @@ exports.fullUploadEpisode = async (req, res) => {
       transcript_json: transcriptJson,
       release_date
     });
+    
+    // add speakers
+    for (let speakerName of speakers) {
+      speakerName = speakerName.trim();
+
+      const speakerRes = await pool.query(
+        `SELECT id FROM speakers WHERE name = $1`,
+        [speakerName]
+      );
+
+      let speakerId;
+      if (speakerRes.rows.length > 0) {
+        speakerId = speakerRes.rows[0].id;
+      } else {
+        const insertRes = await pool.query(
+          `INSERT INTO speakers (name) VALUES ($1) RETURNING id`,
+          [speakerName]
+        );
+        speakerId = insertRes.rows[0].id;
+      }
+
+      await pool.query(
+        `INSERT INTO episode_speakers (episode_id, speaker_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [episode.id, speakerId]
+      );
+    }
 
     // clean up 
     if (audioFile.path && fs.existsSync(audioFile.path)) {
