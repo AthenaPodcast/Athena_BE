@@ -719,6 +719,32 @@ const getEpisodeScript = async (req, res) => {
   }
 };
 
+const deleteReview = async (req, res) => {
+  const reviewId = req.params.id;
+
+  try {
+    const checkRes = await pool.query(
+      `SELECT id FROM reviews WHERE id = $1`,
+      [reviewId]
+    );
+
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Review not found' });
+    }
+
+    await pool.query(
+      `DELETE FROM reviews WHERE id = $1`,
+      [reviewId]
+    );
+
+    res.json({ message: 'Review deleted successfully' });
+
+  } catch (err) {
+    console.error('Error in deleteReview:', err);
+    res.status(500).json({ message: 'Failed to delete review', error: err.message });
+  }
+};
+
 
 module.exports = {
   getChannelRequests,
@@ -738,5 +764,6 @@ module.exports = {
   deletePodcast,
   deleteEpisode,
   getChannelOwnerSummary,
-  getEpisodeScript
+  getEpisodeScript,
+  deleteReview
 };
