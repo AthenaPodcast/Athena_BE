@@ -7,7 +7,13 @@ const {
   getMostSavedPodcasts,
   getTopListeners,
   getTopCategories,
-  getAverageListeningTime
+  getAverageListeningTime,
+  getMostReviewedEpisodes,
+  getTopRatedEpisodes,
+  getInactiveUsers,
+  getNewUsers,
+  getNewEpisodes,
+  getInsightsSummary
 } = require('../controllers/insights.controller');
 
 router.use(verifyToken, adminOnly);
@@ -17,5 +23,12 @@ router.get('/most-saved-podcasts', getMostSavedPodcasts);
 router.get('/top-listeners', getTopListeners);
 router.get('/top-categories', getTopCategories);
 router.get('/avg-listening-time', getAverageListeningTime);
+router.get('/most-reviewed-episodes', getMostReviewedEpisodes);
+router.get('/top-rated-episodes', getTopRatedEpisodes);
+router.get('/inactive-users', getInactiveUsers);
+router.get('/new-users', getNewUsers);
+router.get('/new-episodes', getNewEpisodes);
+router.get('/summary', getInsightsSummary);
+
 
 module.exports = router;
