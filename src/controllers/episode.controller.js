@@ -13,6 +13,7 @@ const {
  } = require('../models/episode.model');
  
 const { transcribeAudioFromUrl } = require('../utils/transcribe');
+const { streamUpload } = require('../utils/cloudinaryUpload');
 
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
@@ -24,6 +25,7 @@ const fs = require('fs');
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
+// testing purposes only 
 exports.uploadAudioToCloudinary = async (req, res) => {
   try {
     const file = req.file;
@@ -263,24 +265,7 @@ exports.fullUploadEpisode = async (req, res) => {
     }
 
     // upload audio to cloudinary
-    const streamUpload = (fileBuffer) => {
-      return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            resource_type: 'video',
-            folder: 'episods',
-          },
-          (error, result) => {
-            if (result) resolve(result);
-            else reject(error);
-          }
-        );
-        
-        stream.end(fileBuffer);
-      });
-    };
-    
-    const uploadResult = await streamUpload(audioFile.buffer);
+    const uploadResult = await streamUpload(req.file.buffer, 'episods');
     const audioUrl = uploadResult.secure_url;
 
     // extract duration of audio with FFmpeg
