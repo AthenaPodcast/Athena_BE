@@ -92,7 +92,34 @@ const getAdForEpisode = async (req, res) => {
   }
 };
 
+const logAdPlay = async (req, res) => {
+  const { ad_campaign_id, episode_id } = req.body;
+  const user_id = req.user.accountId;
+
+  if (!ad_campaign_id || !episode_id) {
+    return res.status(400).json({ error: 'ad_campaign_id and episode_id are required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO ad_play_logs (ad_campaign_id, episode_id, user_id)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [ad_campaign_id, episode_id, user_id]
+    );
+
+    res.status(201).json({
+      message: 'Ad play logged successfully',
+      log: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Error in logAdPlay:', err);
+    res.status(500).json({ error: 'Failed to log ad play' });
+  }
+};
+
+
 module.exports = {
     createAdCampaign,
-    getAdForEpisode
+    getAdForEpisode,
+    logAdPlay
 };
