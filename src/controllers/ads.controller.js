@@ -44,6 +44,55 @@ const createAdCampaign = async (req, res) => {
   }
 };
 
+const getAdForEpisode = async (req, res) => {
+  const episodeId = req.params.episodeId;
+
+  try {
+    // get categories of the episode's podcast
+    const categoryRes = await pool.query(
+      `SELECT pc.category_id
+       FROM episodes e
+       JOIN podcasts p ON e.podcast_id = p.id
+       JOIN podcastcategory pc ON pc.podcast_id = p.id
+       WHERE e.id = $1`,
+      [episodeId]
+    );
+
+    const categoryIds = categoryRes.rows.map(row => row.category_id);
+    if (categoryIds.length === 0) {
+      return res.status(404).json({ message: 'No category assigned to episode' });
+    }
+
+    // find matching ad campaign by category
+    const adRes = await pool.query(
+      `SELECT *
+       FROM ad_campaigns
+       WHERE target_category_id = ANY($1::int[])
+       ORDER BY RANDOM()
+       LIMIT 1`,
+      [categoryIds]
+    );
+
+    if (adRes.rows.length === 0) {
+      return res.status(404).json({ message: 'No ads available for this episode.' });
+    }
+
+    const ad = adRes.rows[0];
+
+    res.json({
+      ad_campaign_id: ad.id,
+      audio_url: ad.audio_url,
+      insert_every_minutes: ad.insert_every_minutes,
+      max_per_episode: ad.max_per_episode
+    });
+
+  } catch (err) {
+    console.error('Error in getAdForEpisode:', err);
+    res.status(500).json({ error: 'Failed to fetch ad for episode' });
+  }
+};
+
 module.exports = {
-    createAdCampaign
+    createAdCampaign,
+    getAdForEpisode
 };

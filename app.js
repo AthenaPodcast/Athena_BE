@@ -21,6 +21,7 @@ app.use('/api', listenRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', channelRequestRoutes);
 app.use('/api/admin/insights', insightsRoutes);
+app.use('/api/ads', adsRoutes);
 app.use('/api/admin/ads', adsRoutes);
 
 module.exports = app;
