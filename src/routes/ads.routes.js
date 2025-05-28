@@ -14,7 +14,7 @@ const upload = multer({ storage });
 
 // public
 // get best matching campaign
-router.get('/for-episode/:episodeId', getAdForEpisode);
+router.get('/for-episode/:episodeId', verifyToken, getAdForEpisode);
 router.post('/play-log', verifyToken, logAdPlay);
 
 //admin

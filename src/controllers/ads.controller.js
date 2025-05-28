@@ -46,6 +46,7 @@ const createAdCampaign = async (req, res) => {
 
 const getAdForEpisode = async (req, res) => {
   const episodeId = req.params.episodeId;
+  const user_id = req.user.accountId;
 
   try {
     // get categories of the episode's podcast
@@ -66,11 +67,20 @@ const getAdForEpisode = async (req, res) => {
     // find matching ad campaign by category
     const adRes = await pool.query(
       `SELECT *
-       FROM ad_campaigns
-       WHERE target_category_id = ANY($1::int[])
-       ORDER BY RANDOM()
-       LIMIT 1`,
-      [categoryIds]
+      FROM ad_campaigns
+      WHERE (target_category_id IS NULL OR target_category_id = ANY($1::int[]))
+      AND id NOT IN (
+        SELECT ad_campaign_id FROM ad_play_logs
+        WHERE user_id = $2
+        AND DATE_TRUNC('month', played_at) = DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY ad_campaign_id
+        HAVING COUNT(*) >= (
+          SELECT max_per_month FROM ad_campaigns WHERE ad_campaigns.id = ad_play_logs.ad_campaign_id
+        )
+      )
+      ORDER BY RANDOM()
+      LIMIT 1`,
+      [categoryIds, userId]
     );
 
     if (adRes.rows.length === 0) {
