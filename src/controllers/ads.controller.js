@@ -1,5 +1,8 @@
 const pool = require('../../db');
 const { streamUpload } = require('../utils/cloudinaryUpload');
+const { Parser } = require('json2csv');
+const fs = require('fs');
+const path = require('path');
 
 const createAdCampaign = async (req, res) => {
   try {
@@ -350,6 +353,59 @@ const getAdCampaignSummary = async (req, res) => {
   }
 };
 
+const exportAdInsightsToCSV = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        ac.id,
+        ac.advertiser_name,
+        ac.audio_url,
+        ac.max_per_month,
+        ac.max_per_episode,
+        ac.insert_every_minutes,
+        ac.start_date,
+        ac.end_date,
+        ac.active,
+        COUNT(pl.id) AS total_plays,
+        COUNT(DISTINCT pl.user_id) AS unique_users,
+        CASE 
+          WHEN ac.end_date IS NOT NULL AND ac.end_date < CURRENT_DATE THEN 'Yes'
+          ELSE 'No'
+        END AS is_expired
+      FROM ad_campaigns ac
+      LEFT JOIN ad_play_logs pl ON pl.ad_campaign_id = ac.id
+      GROUP BY ac.id
+    `);
+
+    const fields = [
+      'id',
+      'advertiser_name',
+      'audio_url',
+      'max_per_month',
+      'max_per_episode',
+      'insert_every_minutes',
+      'start_date',
+      'end_date',
+      'active',
+      'total_plays',
+      'unique_users',
+      'is_expired'
+    ];
+
+    const parser = new Parser({ fields });
+    const csv = parser.parse(result.rows);
+
+    // set headers to trigger download
+    res.header('Content-Type', 'text/csv');
+    res.attachment('ad_insights_export.csv');
+    return res.send(csv);
+
+  } catch (err) {
+    console.error('Error exporting insights:', err);
+    res.status(500).json({ error: 'Failed to export ad insights' });
+  }
+};
+
 module.exports = {
     createAdCampaign,
     getAdForEpisode,
@@ -360,5 +416,6 @@ module.exports = {
     deleteAdCampaign,
     updateAdCampaign,
     getAllAdCampaigns,
-    getAdCampaignSummary
+    getAdCampaignSummary,
+    exportAdInsightsToCSV
 };

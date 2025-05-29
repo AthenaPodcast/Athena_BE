@@ -12,7 +12,8 @@ const {
     deleteAdCampaign,
     updateAdCampaign,
     getAllAdCampaigns,
-    getAdCampaignSummary
+    getAdCampaignSummary,
+    exportAdInsightsToCSV
  } = require('../controllers/ads.controller');
 const multer = require('multer')
 
@@ -33,6 +34,7 @@ router.get('/analytics', getAdAnalytics);
 router.get('/summary', getAdCampaignSummary);
 router.get('/campaigns', getAllAdCampaigns);
 router.get('/:id', getAdCampaignById);
+router.get('/analytics/export', exportAdInsightsToCSV);
 
 router.patch('/:id/status', updateAdStatus);
 router.put('/campaign/:id', upload.none(), updateAdCampaign);
