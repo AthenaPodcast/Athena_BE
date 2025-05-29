@@ -327,6 +327,29 @@ const getAllAdCampaigns = async (req, res) => {
   }
 };
 
+const getAdCampaignSummary = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE active = true AND (end_date IS NULL OR end_date >= CURRENT_DATE)) AS active,
+        COUNT(*) FILTER (WHERE end_date IS NOT NULL AND end_date < CURRENT_DATE) AS expired
+      FROM ad_campaigns
+    `);
+
+    const { total, active, expired } = result.rows[0];
+
+    res.json({
+      total: parseInt(total),
+      active: parseInt(active),
+      expired: parseInt(expired)
+    });
+  } catch (err) {
+    console.error('Error in getAdCampaignSummary:', err);
+    res.status(500).json({ message: 'Failed to fetch ad campaign summary' });
+  }
+};
+
 module.exports = {
     createAdCampaign,
     getAdForEpisode,
@@ -336,5 +359,6 @@ module.exports = {
     getAdCampaignById,
     deleteAdCampaign,
     updateAdCampaign,
-    getAllAdCampaigns
+    getAllAdCampaigns,
+    getAdCampaignSummary
 };

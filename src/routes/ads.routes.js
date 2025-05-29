@@ -11,7 +11,8 @@ const {
     getAdCampaignById,
     deleteAdCampaign,
     updateAdCampaign,
-    getAllAdCampaigns
+    getAllAdCampaigns,
+    getAdCampaignSummary
  } = require('../controllers/ads.controller');
 const multer = require('multer')
 
@@ -29,6 +30,7 @@ router.use(verifyToken, adminOnly);
 router.post('/campaign', upload.single('audio'), createAdCampaign);
 
 router.get('/analytics', getAdAnalytics);
+router.get('/summary', getAdCampaignSummary);
 router.get('/campaigns', getAllAdCampaigns);
 router.get('/:id', getAdCampaignById);
 
