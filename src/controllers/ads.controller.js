@@ -238,6 +238,23 @@ const getAdCampaignById = async (req, res) => {
   }
 };
 
+const deleteAdCampaign = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query('DELETE FROM ad_campaigns WHERE id = $1 RETURNING *', [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Campaign not found' });
+    }
+
+    res.json({ message: 'Ad campaign deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting ad campaign:', err);
+    res.status(500).json({ message: 'Failed to delete ad campaign' });
+  }
+};
+
 
 module.exports = {
     createAdCampaign,
@@ -245,5 +262,6 @@ module.exports = {
     logAdPlay,
     getAdAnalytics,
     updateAdStatus,
-    getAdCampaignById
+    getAdCampaignById,
+    deleteAdCampaign
 };
