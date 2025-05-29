@@ -5,7 +5,9 @@ const adminOnly = require('../middlewares/adminOnly.middleware');
 const { 
     createAdCampaign,
     getAdForEpisode,
-    logAdPlay
+    logAdPlay,
+    getAdAnalytics,
+    updateAdStatus
  } = require('../controllers/ads.controller');
 const multer = require('multer')
 
@@ -21,6 +23,11 @@ router.post('/play-log', verifyToken, logAdPlay);
 router.use(verifyToken, adminOnly);
 // upload ad audio + metadata
 router.post('/campaign', upload.single('audio'), createAdCampaign);
+
+router.get('/analytics', getAdAnalytics);
+
+router.patch('/:id/status', updateAdStatus);
+
 
 module.exports = router;
 

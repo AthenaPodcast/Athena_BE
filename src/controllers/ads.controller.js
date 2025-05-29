@@ -127,9 +127,67 @@ const logAdPlay = async (req, res) => {
   }
 };
 
+const getAdAnalytics = async (req, res) => {
+  try {
+    const topAdsResult = await pool.query(`
+      SELECT ac.id, ac.advertiser_name, COUNT(al.id) AS play_count
+      FROM ad_campaigns ac
+      LEFT JOIN ad_play_logs al ON ac.id = al.ad_campaign_id
+      GROUP BY ac.id
+      ORDER BY play_count DESC
+      LIMIT 5;
+    `);
+
+    const monthlyCountsResult = await pool.query(`
+      SELECT TO_CHAR(played_at, 'YYYY-MM') AS month, COUNT(*) AS count
+      FROM ad_play_logs
+      GROUP BY month
+      ORDER BY month;
+    `);
+
+    res.json({
+      top_ads: topAdsResult.rows,
+      monthly_play_counts: monthlyCountsResult.rows
+    });
+  } catch (err) {
+    console.error('Error in getAdAnalytics:', err);
+    res.status(500).json({ message: 'Failed to fetch ad analytics' });
+  }
+};
+
+const updateAdStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { active } = req.body;
+
+    if (typeof active !== 'boolean') {
+      return res.status(400).json({ error: 'Missing or invalid "active" in request body' });
+    }
+
+    const result = await pool.query(
+      `UPDATE ad_campaigns SET active = $1 WHERE id = $2 RETURNING *`,
+      [active, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Ad campaign not found' });
+    }
+
+    res.status(200).json({
+      message: 'Ad status updated successfully',
+      campaign: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Error updating ad status:', err);
+    res.status(500).json({ message: 'Failed to update ad status' });
+  }
+};
+
 
 module.exports = {
     createAdCampaign,
     getAdForEpisode,
-    logAdPlay
+    logAdPlay,
+    getAdAnalytics,
+    updateAdStatus
 };
