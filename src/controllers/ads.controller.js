@@ -68,7 +68,8 @@ const getAdForEpisode = async (req, res) => {
     const adRes = await pool.query(
       `SELECT *
       FROM ad_campaigns
-      WHERE (target_category_id IS NULL OR target_category_id = ANY($1::int[]))
+      WHERE active = true
+      AND (target_category_id IS NULL OR target_category_id = ANY($1::int[]))
       AND id NOT IN (
         SELECT ad_campaign_id FROM ad_play_logs
         WHERE user_id = $2
@@ -80,7 +81,7 @@ const getAdForEpisode = async (req, res) => {
       )
       ORDER BY RANDOM()
       LIMIT 1`,
-      [categoryIds, userId]
+      [categoryIds, user_id]
     );
 
     if (adRes.rows.length === 0) {
