@@ -255,6 +255,59 @@ const deleteAdCampaign = async (req, res) => {
   }
 };
 
+const updateAdCampaign = async (req, res) => {
+  const { id } = req.params;
+  const {
+    advertiser_name,
+    target_category_id,
+    max_per_month,
+    max_per_episode,
+    insert_every_minutes,
+    start_date,
+    end_date,
+    active
+  } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE ad_campaigns
+       SET advertiser_name = $1,
+           target_category_id = $2,
+           max_per_month = $3,
+           max_per_episode = $4,
+           insert_every_minutes = $5,
+           start_date = $6,
+           end_date = $7,
+           active = $8
+       WHERE id = $9
+       RETURNING *`,
+      [
+        advertiser_name,
+        target_category_id || null,
+        max_per_month,
+        max_per_episode,
+        insert_every_minutes,
+        start_date || null,
+        end_date || null,
+        active,
+        id
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Ad campaign not found' });
+    }
+
+    res.json({
+      message: 'Ad campaign updated successfully',
+      campaign: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Error updating ad campaign:', err);
+    res.status(500).json({ error: 'Failed to update ad campaign' });
+  }
+};
+
 
 module.exports = {
     createAdCampaign,
@@ -263,5 +316,6 @@ module.exports = {
     getAdAnalytics,
     updateAdStatus,
     getAdCampaignById,
-    deleteAdCampaign
+    deleteAdCampaign,
+    updateAdCampaign
 };

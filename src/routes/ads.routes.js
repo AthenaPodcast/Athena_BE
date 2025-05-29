@@ -9,7 +9,8 @@ const {
     getAdAnalytics,
     updateAdStatus,
     getAdCampaignById,
-    deleteAdCampaign
+    deleteAdCampaign,
+    updateAdCampaign
  } = require('../controllers/ads.controller');
 const multer = require('multer')
 
@@ -30,6 +31,7 @@ router.get('/analytics', getAdAnalytics);
 router.get('/:id', getAdCampaignById);
 
 router.patch('/:id/status', updateAdStatus);
+router.put('/campaign/:id', upload.none(), updateAdCampaign);
 
 router.delete('/campaign/:id', deleteAdCampaign);
 
