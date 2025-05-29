@@ -198,11 +198,52 @@ const updateAdStatus = async (req, res) => {
   }
 };
 
+const getAdCampaignById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // get campaign info
+    const campaignRes = await pool.query(
+      `SELECT * FROM ad_campaigns WHERE id = $1`,
+      [id]
+    );
+
+    if (campaignRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Ad campaign not found' });
+    }
+
+    const campaign = campaignRes.rows[0];
+
+    // get analytics summary
+    const summaryRes = await pool.query(
+      `SELECT COUNT(*) AS total_plays, COUNT(DISTINCT user_id) AS unique_users
+       FROM ad_play_logs
+       WHERE ad_campaign_id = $1`,
+      [id]
+    );
+
+    const { total_plays, unique_users } = summaryRes.rows[0];
+
+    res.json({
+      campaign,
+      summary: {
+        total_plays: parseInt(total_plays),
+        unique_users: parseInt(unique_users),
+        is_expired: campaign.end_date && new Date(campaign.end_date) < new Date()
+      }
+    });
+  } catch (err) {
+    console.error('Error in getAdCampaignById:', err);
+    res.status(500).json({ message: 'Failed to fetch campaign details' });
+  }
+};
+
 
 module.exports = {
     createAdCampaign,
     getAdForEpisode,
     logAdPlay,
     getAdAnalytics,
-    updateAdStatus
+    updateAdStatus,
+    getAdCampaignById
 };

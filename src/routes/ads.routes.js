@@ -7,7 +7,8 @@ const {
     getAdForEpisode,
     logAdPlay,
     getAdAnalytics,
-    updateAdStatus
+    updateAdStatus,
+    getAdCampaignById
  } = require('../controllers/ads.controller');
 const multer = require('multer')
 
@@ -25,6 +26,7 @@ router.use(verifyToken, adminOnly);
 router.post('/campaign', upload.single('audio'), createAdCampaign);
 
 router.get('/analytics', getAdAnalytics);
+router.get('/:id', getAdCampaignById);
 
 router.patch('/:id/status', updateAdStatus);
 
