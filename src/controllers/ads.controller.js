@@ -308,6 +308,24 @@ const updateAdCampaign = async (req, res) => {
   }
 };
 
+const getAllAdCampaigns = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT *,
+        (end_date IS NOT NULL AND end_date < CURRENT_DATE) AS is_expired
+      FROM ad_campaigns
+      ORDER BY created_at DESC`
+    );
+
+    res.json({
+      message: 'Ad campaigns fetched successfully',
+      campaigns: result.rows,
+    });
+  } catch (err) {
+    console.error('Error fetching all ad campaigns:', err);
+    res.status(500).json({ error: 'Failed to fetch ad campaigns' });
+  }
+};
 
 module.exports = {
     createAdCampaign,
@@ -317,5 +335,6 @@ module.exports = {
     updateAdStatus,
     getAdCampaignById,
     deleteAdCampaign,
-    updateAdCampaign
+    updateAdCampaign,
+    getAllAdCampaigns
 };
