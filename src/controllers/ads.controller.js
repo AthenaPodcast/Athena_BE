@@ -8,8 +8,18 @@ const createAdCampaign = async (req, res) => {
       target_category_id,
       max_per_month,
       max_per_episode,
-      insert_every_minutes
+      insert_every_minutes,
+      start_date,
+      end_date
     } = req.body;
+
+    const toIntOrNull = (v) => v === '' ? null : parseInt(v);
+
+    const categoryId = toIntOrNull(target_category_id);
+    const maxMonth = toIntOrNull(max_per_month);
+    const maxEpisode = toIntOrNull(max_per_episode);
+    const insertMinutes = toIntOrNull(insert_every_minutes);
+
 
     const audioFile = req.file;
     if (!audioFile) {
@@ -22,15 +32,17 @@ const createAdCampaign = async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO ad_campaigns (advertiser_name, audio_url, target_category_id,
-       max_per_month, max_per_episode, insert_every_minutes)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+       max_per_month, max_per_episode, insert_every_minutes, start_date, end_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         advertiser_name,
         audio_url,
-        target_category_id,
-        max_per_month,
-        max_per_episode,
-        insert_every_minutes
+        categoryId,
+        maxMonth,
+        maxEpisode,
+        insertMinutes,
+        start_date || null, 
+        end_date || null
       ]
     );
 
@@ -70,6 +82,8 @@ const getAdForEpisode = async (req, res) => {
       FROM ad_campaigns
       WHERE active = true
       AND (target_category_id IS NULL OR target_category_id = ANY($1::int[]))
+      AND (start_date IS NULL OR CURRENT_DATE >= start_date)
+      AND (end_date IS NULL OR CURRENT_DATE <= end_date)
       AND id NOT IN (
         SELECT ad_campaign_id FROM ad_play_logs
         WHERE user_id = $2
