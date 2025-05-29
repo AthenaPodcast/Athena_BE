@@ -13,7 +13,8 @@ const {
     updateAdCampaign,
     getAllAdCampaigns,
     getAdCampaignSummary,
-    exportAdInsightsToCSV
+    exportAdInsightsToCSV,
+    renewAdCampaign
  } = require('../controllers/ads.controller');
 const multer = require('multer')
 
@@ -29,6 +30,7 @@ router.post('/play-log', verifyToken, logAdPlay);
 router.use(verifyToken, adminOnly);
 // upload ad audio + metadata
 router.post('/campaign', upload.single('audio'), createAdCampaign);
+router.post('/:id/renew', renewAdCampaign);
 
 router.get('/analytics', getAdAnalytics);
 router.get('/summary', getAdCampaignSummary);

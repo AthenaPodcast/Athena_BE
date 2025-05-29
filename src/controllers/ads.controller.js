@@ -406,6 +406,61 @@ const exportAdInsightsToCSV = async (req, res) => {
   }
 };
 
+const renewAdCampaign = async (req, res) => {
+  try {
+    const oldId = req.params.id;
+
+    // Get the original campaign
+    const { rows } = await pool.query(`SELECT * FROM ad_campaigns WHERE id = $1`, [oldId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Original campaign not found' });
+    }
+
+    const old = rows[0];
+
+    // Use new fields if provided
+    const {
+      advertiser_name = old.advertiser_name,
+      target_category_id = old.target_category_id,
+      max_per_month = old.max_per_month,
+      max_per_episode = old.max_per_episode,
+      insert_every_minutes = old.insert_every_minutes,
+      start_date,
+      end_date
+    } = req.body;
+
+    const audio_url = old.audio_url; // Reuse existing audio
+
+    const result = await pool.query(
+      `INSERT INTO ad_campaigns (
+        advertiser_name, audio_url, target_category_id,
+        max_per_month, max_per_episode, insert_every_minutes,
+        start_date, end_date
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING *`,
+      [
+        advertiser_name,
+        audio_url,
+        target_category_id,
+        max_per_month,
+        max_per_episode,
+        insert_every_minutes,
+        start_date || null,
+        end_date || null
+      ]
+    );
+
+    res.status(201).json({
+      message: 'Campaign renewed successfully',
+      new_campaign: result.rows[0]
+    });
+  } catch (err) {
+    console.error('Error renewing campaign:', err);
+    res.status(500).json({ error: 'Failed to renew campaign' });
+  }
+};
+
+
 module.exports = {
     createAdCampaign,
     getAdForEpisode,
@@ -417,5 +472,6 @@ module.exports = {
     updateAdCampaign,
     getAllAdCampaigns,
     getAdCampaignSummary,
-    exportAdInsightsToCSV
+    exportAdInsightsToCSV,
+    renewAdCampaign
 };
