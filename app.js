@@ -13,6 +13,9 @@ const adminRoutes = require('./src/routes/admin.routes');
 const channelRequestRoutes = require('./src/routes/channelRequest.routes');
 const insightsRoutes = require('./src/routes/insights.routes');
 const adsRoutes = require('./src/routes/ads.routes');
+const externalChannelRoutes = require('./src/routes/externalChannel.routes');
+const externalEpisodeRoutes = require('./src/routes/externalEpisode.routes');
+const externalPodcastRoutes = require('./src/routes/externalPodcast.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -23,5 +26,8 @@ app.use('/api', channelRequestRoutes);
 app.use('/api/admin/insights', insightsRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/admin/ads', adsRoutes);
+app.use('/api/admin', externalChannelRoutes);
+app.use('/api/admin', externalEpisodeRoutes);
+app.use('/api/admin', externalPodcastRoutes);
 
 module.exports = app;

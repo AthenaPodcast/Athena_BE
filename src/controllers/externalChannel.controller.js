@@ -1,0 +1,108 @@
+const pool = require('../../db');
+const ExternalChannelModel = require('../models/externalChannel.model');
+const ExternalPodcastModel = require('../models/externalPodcast.model');
+
+exports.createExternalChannel = async (req, res) => {
+  try {
+    const adminId = req.user.accountId;
+    const { name, description, picture_url } = req.body;
+
+    if (!name || !description || !picture_url) {
+      return res.status(400).json({ error: 'Missing name, description, or picture URL' });
+    }
+
+    const channel = await ExternalChannelModel.create({ 
+        admin_id: adminId,
+        name, 
+        description, 
+        picture_url 
+    });
+
+    res.status(201).json({ message: 'Channel created successfully', channel });
+  } catch (err) {
+    console.error('Error creating external channel:', err);
+    res.status(500).json({ error: 'Failed to create channel' });
+  }
+};
+
+exports.getAllExternalChannels = async (req, res) => {
+  try {
+    const channels = await ExternalChannelModel.getAll();
+    res.status(200).json({ channels });
+  } catch (err) {
+    console.error('Error fetching channels:', err);
+    res.status(500).json({ error: 'Failed to fetch channels' });
+  }
+};
+
+exports.getExternalChannelById = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const channel = await ExternalChannelModel.getById(id);
+
+    if (!channel) return res.status(404).json({ error: 'Channel not found' });
+
+    res.status(200).json({ channel });
+  } catch (err) {
+    console.error('Error fetching channel:', err);
+    res.status(500).json({ error: 'Failed to fetch channel' });
+  }
+};
+
+exports.deleteExternalChannel = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const deleted = await ExternalChannelModel.deleteById(id);
+
+    if (!deleted) return res.status(404).json({ error: 'Channel not found' });
+
+    res.status(200).json({ message: 'Channel deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting channel:', err);
+    res.status(500).json({ error: 'Failed to delete channel' });
+  }
+};
+
+exports.getPodcastsByChannelId = async (req, res) => {
+  try {
+    const channelId = req.params.channelId;
+    const podcasts = await ExternalPodcastModel.getByChannel(channelId);
+    res.status(200).json({ podcasts });
+  } catch (err) {
+    console.error('Error fetching podcasts:', err);
+    res.status(500).json({ error: 'Failed to fetch podcasts' });
+  }
+};
+
+exports.createPodcastUnderChannel = async (req, res) => {
+  try {
+    const channelId = req.params.channelId;
+    const { name, description, picture_url, category_ids } = req.body;
+
+    if (!name || !description || !Array.isArray(category_ids) || category_ids.length === 0 || !picture_url) {
+      return res.status(400).json({ error: 'Missing required podcast fields' });
+    }
+
+    const { rows: validCategories } = await pool.query(
+        `SELECT id FROM categories WHERE id = ANY($1::int[])`,
+        [category_ids]
+    );
+
+    if (validCategories.length !== category_ids.length) {
+      return res.status(400).json({ error: 'Some category IDs are invalid' });
+    }
+   
+    const podcast = await ExternalPodcastModel.create({
+      channel_id: channelId,
+      name,
+      description,
+      picture_url,
+      category_ids 
+    });
+
+    res.status(201).json({ message: 'Podcast created', podcast });
+  } catch (err) {
+    console.error('Error creating podcast:', err);
+    res.status(500).json({ error: 'Failed to create podcast' });
+  }
+};
