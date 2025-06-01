@@ -2,6 +2,7 @@ const youtubedl = require('youtube-dl-exec');
 const ExternalEpisodeModel = require('../models/externalEpisode.model');
 const { uploadAudioFromYoutube } = require('../utils/cloudinaryUpload');
 const pool = require('../../db');
+const { transcribeAudioFromUrl } = require('../utils/transcribe');
 
 exports.createExternalEpisode = async (req, res) => {
   try {
@@ -22,7 +23,7 @@ exports.createExternalEpisode = async (req, res) => {
     let finalAudioUrl = audio_url;
     let finalDuration = null;
 
-    // extract metadata if youtube_url is provided
+    // extract metadata from youtube_url
     if (youtube_url) {
       try {
         const info = await youtubedl(youtube_url, {
@@ -88,6 +89,42 @@ exports.createExternalEpisode = async (req, res) => {
           [episode.id, speakerId]
         );
       }
+    }
+
+    // transcribe using Whisper AI
+    try {
+    const { script, transcript_json } = await transcribeAudioFromUrl(finalAudioUrl);
+    
+    // 🟡 Add debugging
+    console.log('🔹 Whisper transcription result:');
+    console.log('script preview:', script?.slice?.(0, 80));
+    console.log('transcript_json is array?', Array.isArray(transcript_json));
+    console.log('First word:', transcript_json?.[0]);
+    console.log('Stringified:', JSON.stringify(transcript_json)?.slice?.(0, 100));
+
+    // ✅ Save only if transcript_json is valid
+    if (Array.isArray(transcript_json)) {
+      await pool.query(
+        `UPDATE episodes SET script = $1, transcript_json = $2 WHERE id = $3`,
+        [script, JSON.stringify(transcript_json), episode.id]
+      );
+      episode.script = script;
+      episode.transcript_json = transcript_json;
+    } else {
+      console.warn('⚠️ transcript_json is invalid. Skipping save to DB.');
+    }
+
+    // await pool.query(
+    //     `UPDATE episodes SET script = $1, transcript_json = $2 WHERE id = $3`,
+    //     [script, JSON.stringify(transcript_json), episode.id]
+    // );
+
+    // // attach transcript to response
+    // episode.script = script;
+    // episode.transcript_json = transcript_json;
+
+    } catch (transcriptError) {
+    console.error('Whisper transcription failed:', transcriptError);
     }
 
     res.status(201).json({ message: 'Episode created successfully', episode });
