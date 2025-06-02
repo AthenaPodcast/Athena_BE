@@ -26,8 +26,7 @@ const getMostSavedPodcasts = async (req, res) => {
       `SELECT p.id AS podcast_id, p.name AS podcast_name, cp.channel_name, COUNT(ps.*) AS save_count
        FROM podcast_saves ps
        JOIN podcasts p ON ps.podcast_id = p.id
-       JOIN accounts a ON p.channel_account_id = a.id
-       JOIN channelprofile cp ON cp.account_id = a.id
+       JOIN channelprofile cp ON p.channel_id = cp.id
        WHERE ps.saved = true
        GROUP BY p.id, p.name, cp.channel_name
        ORDER BY save_count DESC
@@ -200,8 +199,7 @@ const getNewEpisodes = async (req, res) => {
               p.name AS podcast_name, cp.channel_name
        FROM episodes e
        JOIN podcasts p ON e.podcast_id = p.id
-       JOIN accounts a ON p.channel_account_id = a.id
-       JOIN channelprofile cp ON cp.account_id = a.id
+       JOIN channelprofile cp ON p.channel_id = cp.id
        WHERE DATE_TRUNC('month', e.created_at) = DATE_TRUNC('month', CURRENT_DATE)
        ORDER BY e.created_at DESC`
     );
@@ -217,7 +215,7 @@ const getInsightsSummary = async (req, res) => {
   try {
     const [users, channels, podcasts, episodes, totalTime, avgDuration] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM accounts WHERE account_type = 'regular'`),
-      pool.query(`SELECT COUNT(*) FROM accounts WHERE account_type = 'channel'`),
+      pool.query(`SELECT COUNT(*) FROM channelprofile`),
       pool.query(`SELECT COUNT(*) FROM podcasts`),
       pool.query(`SELECT COUNT(*) FROM episodes`),
       pool.query(`SELECT FLOOR(SUM(progress) / 3600) AS total_hours FROM recentlyplayed`),
@@ -244,7 +242,7 @@ const getDashboardSummary = async (req, res) => {
     // total counts
     const [users, channels, podcasts, episodes] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM accounts WHERE account_type = 'regular'`),
-      pool.query(`SELECT COUNT(*) FROM accounts WHERE account_type = 'channel'`),
+      pool.query(`SELECT COUNT(*) FROM channelprofile`),
       pool.query(`SELECT COUNT(*) FROM podcasts`),
       pool.query(`SELECT COUNT(*) FROM episodes`)
     ]);
@@ -262,6 +260,17 @@ const getDashboardSummary = async (req, res) => {
        WHERE el.liked = true
        GROUP BY e.id, e.name
        ORDER BY like_count DESC
+       LIMIT 1`
+    );
+
+   // most saved podcast
+    const mostSaved = await pool.query(
+      `SELECT p.id, p.name, COUNT(ps.*) AS save_count
+       FROM podcast_saves ps
+       JOIN podcasts p ON ps.podcast_id = p.id
+       WHERE ps.saved = true
+       GROUP BY p.id, p.name
+       ORDER BY save_count DESC
        LIMIT 1`
     );
 
@@ -301,6 +310,7 @@ const getDashboardSummary = async (req, res) => {
       },
       highlights: {
         most_liked_episode: mostLiked.rows[0] || null,
+        most_saved_podcast: mostSaved.rows[0] || null,
         top_listener: topListener.rows[0] || null,
         top_category: topCategory.rows[0] || null
       }
