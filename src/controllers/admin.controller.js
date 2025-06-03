@@ -22,7 +22,8 @@ const {
   deleteEpisodeById,
   getChannelOwnerSummaryById,
   getEpisodeScriptById,
-  deleteReviewById
+  deleteReviewById,
+  getAdminProfileById
 } = require('../models/admin.model');
 
 const getChannelRequests = async (req, res) => {
@@ -247,6 +248,20 @@ const deleteReview = async (req, res) => {
   }
 };
 
+const getAdminProfile = async (req, res) => {
+  try {
+    const adminId = req.user.accountId;
+    const profile = await getAdminProfileById(adminId);
+    if (!profile) {
+      return res.status(404).json({ message: 'Admin profile not found' });
+    }
+    res.json(profile);
+  } catch (err) {
+    console.error('Error in getAdminProfile:', err);
+    res.status(500).json({ message: 'Failed to fetch admin profile' });
+  }
+};
+
 module.exports = {
   getChannelRequests,
   approveRequest,
@@ -266,5 +281,6 @@ module.exports = {
   deleteEpisode,
   getChannelOwnerSummary,
   getEpisodeScript,
-  deleteReview
+  deleteReview,
+  getAdminProfile
 };
