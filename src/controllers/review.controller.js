@@ -47,7 +47,8 @@ const getEpisodeReviews = async (req, res) => {
   }
 
   const reviews = await ReviewModel.getByEpisodeId(episodeId);
-  res.status(200).json({ reviews });
+  const avgRating = await ReviewModel.getAverageRating(episodeId);
+  res.status(200).json({ avg_rating: parseFloat(avgRating), reviews });
 };
 
 const deleteReview = async (req, res) => {

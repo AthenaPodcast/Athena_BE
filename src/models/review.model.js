@@ -35,6 +35,14 @@ const ReviewModel = {
 
   async deleteById(reviewId) {
     await pool.query('DELETE FROM reviews WHERE id = $1', [reviewId]);
+  },
+
+  async getAverageRating(episodeId) {
+  const result = await pool.query(
+    'SELECT AVG(rating)::numeric(2,1) AS avg_rating FROM reviews WHERE episode_id = $1',
+    [episodeId]
+  );
+  return result.rows[0].avg_rating || 0;
   }
 };
 
