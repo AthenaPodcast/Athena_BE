@@ -15,6 +15,7 @@ const {
 
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { requireChannel, validatePodcastOwnership } = require('../middlewares/channel.middleware');
+const { submitReview } = require('../controllers/review.controller');
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -55,6 +56,8 @@ router.get('/:id', getEpisodeDetails);
 // generate script for the audio
 router.post('/:episodeId/generate-script', verifyToken, requireChannel, generateScript);
 
+// post a review on episode 
+router.post('/:episodeId/reviews', verifyToken, submitReview);
 
 // POST /api/episodes/full-upload
 router.post(
@@ -64,6 +67,5 @@ router.post(
   upload.single('audio'),        
   fullUploadEpisode              
 );
-
 
 module.exports = router;
