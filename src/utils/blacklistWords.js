@@ -6,5 +6,11 @@ module.exports = [
   "garbage",
   "sucks",
   "shut up",
-  "kill yourself"
+  "kill yourself",
+  "غبي",
+  "تافه",
+  "حقير",
+  "قذر",
+  "اخرس",
+  "تسكت"
 ];

@@ -15,7 +15,7 @@ const {
 
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { requireChannel, validatePodcastOwnership } = require('../middlewares/channel.middleware');
-const { submitReview } = require('../controllers/review.controller');
+const { submitReview, getEpisodeReviews, deleteReview } = require('../controllers/review.controller');
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -58,6 +58,12 @@ router.post('/:episodeId/generate-script', verifyToken, requireChannel, generate
 
 // post a review on episode 
 router.post('/:episodeId/reviews', verifyToken, submitReview);
+
+// get all reviews for the episode
+router.get('/:episodeId/reviews', getEpisodeReviews);
+
+// delete a review - owner
+router.delete('/reviews/:reviewId', verifyToken, deleteReview);
 
 // POST /api/episodes/full-upload
 router.post(

@@ -40,4 +40,35 @@ const submitReview = async (req, res) => {
   res.status(201).json({ message: 'Review submitted successfully', review });
 };
 
-module.exports = { submitReview };
+const getEpisodeReviews = async (req, res) => {
+  const episodeId = parseInt(req.params.episodeId);
+  if (isNaN(episodeId)) {
+    return res.status(400).json({ error: "Invalid episode ID" });
+  }
+
+  const reviews = await ReviewModel.getByEpisodeId(episodeId);
+  res.status(200).json({ reviews });
+};
+
+const deleteReview = async (req, res) => {
+  const reviewId = parseInt(req.params.reviewId);
+  const accountId = req.user.accountId;
+
+  if (isNaN(reviewId)) {
+    return res.status(400).json({ error: "Invalid review ID" });
+  }
+
+  const review = await ReviewModel.getByIdAndAccount(reviewId, accountId);
+  if (!review) {
+    return res.status(403).json({ error: "Not authorized to delete this review" });
+  }
+
+  await ReviewModel.deleteById(reviewId);
+  res.status(200).json({ message: "Review deleted successfully" });
+};
+
+module.exports = { 
+    submitReview,
+    getEpisodeReviews,
+    deleteReview
+ };
