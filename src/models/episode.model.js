@@ -177,6 +177,64 @@ const updateEpisodeScript = async (episodeId, scriptText) => {
   return result.rows[0];
 };
 
+const getEpisodeById = async (episodeId) => {
+  const result = await pool.query(
+    `
+    SELECT e.id, e.name, e.script, e.language, e.podcast_id,
+           p.name AS podcast_name,
+           COALESCE(
+             json_agg(s.name) FILTER (WHERE s.id IS NOT NULL), '[]'
+           ) AS speakers
+    FROM episodes e
+    JOIN podcasts p ON p.id = e.podcast_id
+    LEFT JOIN episode_speakers es ON es.episode_id = e.id
+    LEFT JOIN speakers s ON s.id = es.speaker_id
+    WHERE e.id = $1
+    GROUP BY e.id, p.name;
+    `,
+    [episodeId]
+  );
+
+  return result.rows[0];
+};
+
+const getRecommendationsByCategory = async (episodeId) => {
+  const result = await pool.query(
+    `
+    SELECT ep.id, ep.name, ep.description
+    FROM episodes ep
+    JOIN podcasts p ON p.id = ep.podcast_id
+    WHERE p.category_id = (
+      SELECT p.category_id
+      FROM episodes e
+      JOIN podcasts p ON p.id = e.podcast_id
+      WHERE e.id = $1
+    )
+    AND ep.id != $1
+    ORDER BY RANDOM()
+    LIMIT 3
+    `,
+    [episodeId]
+  );
+  return result.rows;
+};
+
+const getPreviousEpisode = async (episodeId) => {
+  const result = await pool.query(
+    `
+    SELECT e2.id, e2.name, e2.script
+    FROM episodes e1
+    JOIN episodes e2 ON e1.podcast_id = e2.podcast_id
+    WHERE e1.id = $1
+      AND e2.release_date < e1.release_date
+    ORDER BY e2.release_date DESC
+    LIMIT 1
+    `,
+    [episodeId]
+  );
+  return result.rows[0];
+};
+
 module.exports = {
   createEpisode,
   getEpisodesByPodcastId,
@@ -185,5 +243,8 @@ module.exports = {
   getEpisodeLike,
   getLikedEpisodes,
   countLikedEpisodes,
-  updateEpisodeScript
+  updateEpisodeScript,
+  getEpisodeById,
+  getRecommendationsByCategory,
+  getPreviousEpisode
 };
