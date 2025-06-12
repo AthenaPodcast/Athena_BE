@@ -4,7 +4,8 @@ const {
   getPendingRequests,
   updateRequestStatus,
   updateAccountToChannel,
-  getAllRequestsGrouped 
+  getAllRequestsGrouped,
+  getChannelHistoryGrouped 
 } = require('../models/channelRequest.model');
 
 const {
@@ -29,6 +30,11 @@ const {
 const getChannelRequests = async (req, res) => {
   const requests = await getPendingRequests();
   res.json(requests);
+};
+
+const getChannelHistory = async (req, res) => {
+  const result = await getChannelHistoryGrouped();
+  res.json(result);
 };
 
 const approveRequest = async (req, res) => {
@@ -264,6 +270,7 @@ const getAdminProfile = async (req, res) => {
 
 module.exports = {
   getChannelRequests,
+  getChannelHistory,
   approveRequest,
   rejectRequest,
   getAllChannelRequests,

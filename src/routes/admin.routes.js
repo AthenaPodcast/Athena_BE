@@ -7,6 +7,7 @@ const {
   approveRequest,
   rejectRequest,
   getAllChannelRequests,
+  getChannelHistory,
   getAllUsers,
   getAllChannels,
   getAllPodcasts,
@@ -29,6 +30,7 @@ router.use(verifyToken, adminOnly);
 
 router.get('/channel-requests', getChannelRequests);
 router.get('/all-channel-requests', getAllChannelRequests);
+router.get('/history', getChannelHistory);
 router.get('/users', getAllUsers);
 router.get('/channels', getAllChannels);
 router.get('/podcasts', getAllPodcasts);

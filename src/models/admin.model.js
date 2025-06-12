@@ -71,6 +71,7 @@ const getAllPodcasts = async () => {
     if (!grouped[groupKey]) grouped[groupKey] = [];
 
     grouped[groupKey].push({
+      podcast_id: row.id,
       podcast_name: row.podcast_name,
       description: row.description,
       languages: row.languages.filter(Boolean),
@@ -107,6 +108,7 @@ const getAllEpisodes = async () => {
     if (!grouped[groupKey]) grouped[groupKey] = [];
 
     grouped[groupKey].push({
+      episode_id: row.id,
       episode_name: row.episode_name,
       description: row.description,
       duration: row.duration,

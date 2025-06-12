@@ -1,8 +1,9 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 
-// Middlewares
 app.use(express.json()); // to read JSON bodies
+app.use(cors());
 
 // Routes
 const authRoutes = require('./src/routes/auth.routes');
