@@ -12,10 +12,13 @@ exports.createExternalEpisode = async (req, res) => {
       description,
       language,
       release_date,
-      picture_url,
       audio_url, 
-      speakers,
     } = req.body;
+
+    const picture_url = req.file?.filename;
+    if (!picture_url) {
+      return res.status(400).json({ error: 'Episode image is required' });
+    }
 
     let youtube_url = req.body.youtube_url;
     let finalName = name;
@@ -69,6 +72,15 @@ exports.createExternalEpisode = async (req, res) => {
     );
 
     const episode = rows[0];
+    
+    let { speakers } = req.body;
+    
+    if (typeof speakers === 'string') {
+      speakers = speakers
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean); 
+    }
 
     // speakers if provided
     if (Array.isArray(speakers)) {
@@ -138,7 +150,7 @@ exports.getEpisodesByPodcast = async (req, res) => {
   try {
     const podcastId = req.params.podcastId;
     const episodes = await ExternalEpisodeModel.getByPodcastId(podcastId);
-    res.status(200).json({ episodes });
+    res.status(200).json( episodes );
   } catch (err) {
     console.error('Error fetching episodes:', err);
     res.status(500).json({ error: 'Failed to fetch episodes' });

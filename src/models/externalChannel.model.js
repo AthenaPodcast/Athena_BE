@@ -24,8 +24,10 @@ const ExternalChannelModel = {
 
   async getById(id) {
     const result = await pool.query(
-      `SELECT * FROM channelprofile
-       WHERE id = $1 AND created_by_admin = true`,
+      `SELECT cp.*, 
+              (SELECT COUNT(*)::int FROM podcasts p WHERE p.channel_id = cp.id) AS podcast_count
+      FROM channelprofile cp
+      WHERE cp.id = $1 AND cp.created_by_admin = true`,
       [id]
     );
     return result.rows[0];
