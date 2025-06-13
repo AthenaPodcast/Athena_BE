@@ -568,17 +568,18 @@ const deleteReviewById = async (reviewId) => {
 
 const getAdminProfileById = async (adminId) => {
   const result = await pool.query(
-    `SELECT u.first_name, u.last_name, u.profile_picture
+    `SELECT u.first_name, u.last_name, u.profile_picture, a.email, a.phone
      FROM userprofile u
+     JOIN accounts a ON u.account_id = a.id
      WHERE u.account_id = $1`,
     [adminId]
   );
 
   if (result.rows.length === 0) return null;
 
-  const { first_name, last_name, profile_picture } = result.rows[0];
+  const { first_name, last_name, profile_picture, email, phone } = result.rows[0];
   const full_name = `${first_name} ${last_name}`;
-  return { name: full_name, profile_picture };
+  return { name: full_name, profile_picture, email, phone };
 };
 
 module.exports = {

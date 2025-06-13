@@ -23,7 +23,7 @@ const ExternalEpisodeModel = {
 
   async getByPodcastId(podcast_id) {
     const result = await pool.query(
-      `SELECT id, name, audio_url, duration, release_date
+      `SELECT id, name, picture_url, duration, release_date
        FROM episodes WHERE podcast_id = $1
        ORDER BY release_date DESC`,
       [podcast_id]

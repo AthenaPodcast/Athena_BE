@@ -10,17 +10,42 @@ const MAX_SIZE = 25 * 1024 * 1024;
 const SEGMENT_DURATION = 300;
 
 // download audio 
+// async function downloadAudio(url, filename) {
+//   const response = await axios({ url, responseType: 'stream' });
+//   const filePath = path.join(__dirname, filename);
+//   const writer = fs.createWriteStream(filePath);
+
+//   return new Promise((resolve, reject) => {
+//     response.data.pipe(writer);
+//     writer.on('finish', () => resolve(filePath));
+//     writer.on('error', reject);
+//   });
+// }
+
 async function downloadAudio(url, filename) {
+  const rawPath = path.join(__dirname, `raw_${uuidv4()}.webm`);
   const response = await axios({ url, responseType: 'stream' });
-  const filePath = path.join(__dirname, filename);
-  const writer = fs.createWriteStream(filePath);
+  const rawStream = fs.createWriteStream(rawPath);
 
   return new Promise((resolve, reject) => {
-    response.data.pipe(writer);
-    writer.on('finish', () => resolve(filePath));
-    writer.on('error', reject);
+    response.data.pipe(rawStream);
+    rawStream.on('finish', async () => {
+      const outputPath = path.join(__dirname, filename);
+
+      // Convert to valid mp3 format for Whisper
+      ffmpeg(rawPath)
+        .toFormat('mp3')
+        .on('end', () => {
+          fs.unlinkSync(rawPath); // Clean up raw file
+          resolve(outputPath);
+        })
+        .on('error', reject)
+        .save(outputPath);
+    });
+    rawStream.on('error', reject);
   });
 }
+
 
 // compress audio
 async function compressAudio(inputPath, outputPath) {
