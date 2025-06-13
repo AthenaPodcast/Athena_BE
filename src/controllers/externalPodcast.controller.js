@@ -6,7 +6,7 @@ exports.getPodcastById = async (req, res) => {
     if (!podcast) {
       return res.status(404).json({ error: 'Podcast not found' });
     }
-    res.status(200).json({ podcast });
+    res.status(200).json(podcast);
   } catch (err) {
     console.error('Error fetching podcast by ID:', err);
     res.status(500).json({ error: 'Failed to fetch podcast' });

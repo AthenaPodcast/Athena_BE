@@ -1,6 +1,7 @@
 const {
   submitChannelRequest,
-  hasExistingRequest
+  hasExistingRequest,
+  deleteChannelRequestById
 } = require('../models/channelRequest.model');
 
 const requestChannelUpgrade = async (req, res) => {
@@ -23,5 +24,19 @@ const requestChannelUpgrade = async (req, res) => {
   }
 };
 
+const deleteChannelRequest = async (req, res) => {
+  const { id } = req.params;
 
-module.exports = { requestChannelUpgrade };
+  try {
+    await deleteChannelRequestById(id);
+    res.status(200).json({ message: 'Channel request deleted successfully' });
+  } catch (err) {
+    console.error('Delete error:', err);
+    res.status(500).json({ error: 'Failed to delete channel request' });
+  }
+};
+
+module.exports = { 
+  requestChannelUpgrade,
+  deleteChannelRequest
+ };

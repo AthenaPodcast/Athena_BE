@@ -4,6 +4,7 @@ const app = express();
 
 app.use(express.json()); // to read JSON bodies
 app.use(cors());
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 const authRoutes = require('./src/routes/auth.routes');
