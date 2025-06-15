@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middlewares/auth.middleware');
 const adminOnly = require('../middlewares/adminOnly.middleware');
-const upload = require('../config/multer');
+const upload = require('../config/imageMulter');
 
 const {
   createExternalChannel,

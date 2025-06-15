@@ -21,11 +21,15 @@ const requireChannel = async (req, res, next) => {
 // Middleware 2: check if the channel owns the podcast
 const validatePodcastOwnership = async (req, res, next) => {
   const accountId = req.user?.accountId;
-  const { podcast_id } = req.body;
+  const podcast_id = req.body?.podcast_id || req.params?.id;
+
+  if (!podcast_id) {
+    return res.status(400).json({ error: 'Podcast ID is required.' });
+  }
 
   try {
     const result = await pool.query(
-      'SELECT * FROM podcasts WHERE id = $1 AND channel_account_id = $2',
+      'SELECT * FROM podcasts WHERE id = $1 AND channel_id = (SELECT id FROM channelprofile WHERE account_id = $2)',
       [podcast_id, accountId]
     );
 

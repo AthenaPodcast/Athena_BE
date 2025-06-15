@@ -5,7 +5,7 @@ const {
     uploadProfilePicture
   } = require('../controllers/profile.controller');
 const { verifyToken } = require('../middlewares/auth.middleware'); 
-const upload = require('../config/multer');
+const upload = require('../config/imageMulter');
 const { saveUserInterests } = require('../controllers/profile.controller');
 const { deleteUserInterests } = require('../models/userProfile.model');
 

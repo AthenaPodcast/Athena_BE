@@ -9,19 +9,6 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MAX_SIZE = 25 * 1024 * 1024;
 const SEGMENT_DURATION = 300;
 
-// download audio 
-// async function downloadAudio(url, filename) {
-//   const response = await axios({ url, responseType: 'stream' });
-//   const filePath = path.join(__dirname, filename);
-//   const writer = fs.createWriteStream(filePath);
-
-//   return new Promise((resolve, reject) => {
-//     response.data.pipe(writer);
-//     writer.on('finish', () => resolve(filePath));
-//     writer.on('error', reject);
-//   });
-// }
-
 async function downloadAudio(url, filename) {
   const rawPath = path.join(__dirname, `raw_${uuidv4()}.webm`);
   const response = await axios({ url, responseType: 'stream' });
@@ -98,6 +85,7 @@ async function transcribeAudioFromUrl(url) {
   const compressedPath = path.join(__dirname, `temp_compressed_${id}.mp3`);
   const chunkDir = path.join(__dirname, `chunks_${id}`);
   fs.mkdirSync(chunkDir);
+  let lastUsedResult = null;
 
   try {
     await downloadAudio(url, `temp_original_${id}.mp3`);
@@ -138,6 +126,7 @@ async function transcribeAudioFromUrl(url) {
 
     if (sourcePath) {
       const result = await transcribeBuffer(sourcePath);
+      lastUsedResult = result;
       fullText = result.text || '';
       processWords(result.words);
     } else {
@@ -145,6 +134,7 @@ async function transcribeAudioFromUrl(url) {
       for (const file of chunkFiles) {
         const filePath = path.join(chunkDir, file);
         const result = await transcribeBuffer(filePath);
+        lastUsedResult = result;
         fullText += (result.text || '') + ' ';
         processWords(result.words);
 
@@ -159,7 +149,8 @@ async function transcribeAudioFromUrl(url) {
 
     return {
       script: fullText.trim(),
-      transcript_json: mergedWords
+      transcript_json: mergedWords,
+      language: lastUsedResult?.language || 'unknown'
     };
 
   } catch (err) {
