@@ -49,13 +49,21 @@ const insertUserInterests = async (accountId, categoryIds) => {
 const deleteUserInterests = async (accountId) => {
     await pool.query('DELETE FROM UserInterests WHERE account_id = $1', [accountId]);
 };
+
+const markProfileComplete = async (accountId) => {
+  await pool.query(
+    `UPDATE UserProfile SET is_profile_complete = true WHERE account_id = $1`,
+    [accountId]
+  );
+};
   
 module.exports = {
   createUserProfile,
   updateProfileInfo,
   updateProfilePicture,
   insertUserInterests,
-  deleteUserInterests
+  deleteUserInterests,
+  markProfileComplete
 };
 
 

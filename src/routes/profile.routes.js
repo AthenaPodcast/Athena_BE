@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const {
     completeProfile,
-    uploadProfilePicture
+    uploadProfilePicture,
+    saveUserInterests, 
+    isProfileComplete
   } = require('../controllers/profile.controller');
 const { verifyToken } = require('../middlewares/auth.middleware'); 
 const upload = require('../config/imageMulter');
-const { saveUserInterests } = require('../controllers/profile.controller');
 const { deleteUserInterests } = require('../models/userProfile.model');
 
 router.post('/complete', verifyToken, completeProfile);
@@ -32,5 +33,6 @@ router.delete('/interests', verifyToken, async (req, res) => {
     }
   });
   
+router.get('/is-complete', verifyToken, isProfileComplete);
 
 module.exports = router;

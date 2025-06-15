@@ -1,6 +1,10 @@
-const { updateProfileInfo } = require('../models/userProfile.model');
-const { updateProfilePicture } = require('../models/userProfile.model');
-const { insertUserInterests, deleteUserInterests } = require('../models/userProfile.model');
+const { 
+  updateProfileInfo,
+  updateProfilePicture,
+  insertUserInterests,
+  deleteUserInterests,
+  markProfileComplete
+} = require('../models/userProfile.model');
 
 const completeProfile = async (req, res) => {
   const { gender, dateOfBirth } = req.body;
@@ -63,6 +67,7 @@ const saveUserInterests = async (req, res) => {
       // Insert new ones
       await insertUserInterests(accountId, interests);
   
+      await markProfileComplete(accountId);
       res.status(200).json({ message: 'Interests saved successfully' });
     } catch (err) {
       console.error('Error saving interests:', err);
@@ -70,9 +75,27 @@ const saveUserInterests = async (req, res) => {
     }
 };
 
+const isProfileComplete = async (req, res) => {
+  const accountId = req.user.accountId;
+
+  try {
+    const result = await pool.query(
+      `SELECT is_profile_complete FROM UserProfile WHERE account_id = $1`,
+      [accountId]
+    );
+
+    const complete = result.rows[0]?.is_profile_complete || false;
+    res.status(200).json({ isComplete: complete });
+  } catch (err) {
+    console.error('Error checking profile status:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
     completeProfile,
     uploadProfilePicture,
-    saveUserInterests
+    saveUserInterests,
+    isProfileComplete
 };
   
