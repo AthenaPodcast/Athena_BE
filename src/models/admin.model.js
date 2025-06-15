@@ -223,7 +223,7 @@ const getChannelDetailsById = async (channelId) => {
 
   const podcastQuery = isExternal
     ? `SELECT p.id, p.name FROM podcasts p WHERE p.channel_id = $1`
-    : `SELECT p.id, p.name FROM podcasts p WHERE p.channel_account_id = $1`;
+    : `SELECT p.id, p.name FROM podcasts p WHERE p.channel_id = $1`;
 
   const podcastIdParam = isExternal ? channelId : channel.account_id;
   const podcastsRes = await pool.query(podcastQuery, [podcastIdParam]);
@@ -264,6 +264,7 @@ const getChannelDetailsById = async (channelId) => {
     joined_at: channel.created_at
   };
 };
+
 
 const getPodcastDetailsById = async (podcastId) => {
   const podcastRes = await pool.query(
