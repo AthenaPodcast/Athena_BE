@@ -11,9 +11,10 @@ const createEpisode = async (episodeData) => {
     script,
     transcript_json,
     release_date,
+    language
   } = episodeData;
 
-    // Ensure transcript_json is a proper array and not undefined
+  // Ensure transcript_json is a proper array and not undefined
   const safeTranscriptJson = Array.isArray(transcript_json) ? transcript_json : [];
   
   // Validate transcript_json structure
@@ -34,19 +35,16 @@ const createEpisode = async (episodeData) => {
   const query = `
     INSERT INTO episodes (
       podcast_id, name, description, picture_url,
-      audio_url, duration, script, transcript_json, release_date
+      audio_url, duration, script, transcript_json, release_date, language
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
     RETURNING *;
   `;
 
   const values = [
     podcast_id, name, description, picture_url,
-    audio_url, duration, script, jsonString, release_date
+    audio_url, duration, script, jsonString, release_date, language
   ];
-
-  // const result = await pool.query(query, values);
-  // return result.rows[0];
 
   try {
     const result = await pool.query(query, values);

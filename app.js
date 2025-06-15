@@ -20,6 +20,7 @@ const externalEpisodeRoutes = require('./src/routes/externalEpisode.routes');
 const externalPodcastRoutes = require('./src/routes/externalPodcast.routes');
 const userRoutes = require('./src/routes/user.routes');
 const chatRoutes = require('./src/routes/chat.routes');
+const channelRoutes = require('./src/routes/channel.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -35,5 +36,6 @@ app.use('/api/admin', externalEpisodeRoutes);
 app.use('/api/admin', externalPodcastRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', chatRoutes);
+app.use('/api/channel', channelRoutes);
 
 module.exports = app;

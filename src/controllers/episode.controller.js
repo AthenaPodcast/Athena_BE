@@ -248,7 +248,7 @@ exports.generateScript = async (req, res) => {
 // full upload episode (audio, metadata, script with time)
 exports.fullUploadEpisode = async (req, res) => {
   try {
-    let { podcast_id, name, description, release_date, picture_url, speakers } = req.body;
+    let { podcast_id, name, description, release_date, picture_url, speakers, language } = req.body;
     const audioFile = req.file;
 
     if (req.user.type !== 'channel') {
@@ -277,12 +277,34 @@ exports.fullUploadEpisode = async (req, res) => {
     });
 
     // transcribe audio
-    const { script, transcriptJson } = await transcribeAudioFromUrl(audioUrl);
+    const { script, transcript_json: transcriptJson, language: detectedLanguage } = await transcribeAudioFromUrl(audioUrl);
     
-    console.log("transcriptJson PREVIEW:", transcriptJson.slice(0, 3));
-    console.log("total:", transcriptJson.length);
-    console.log("is array?", Array.isArray(transcriptJson));
+    if (!language) {
+      language = detectedLanguage || 'unknown';
+    }
 
+    if (!description || description.trim() === '') {
+      const shortDescription = script.split(' ').slice(0, 30).join(' ') + '...';
+      description = shortDescription;
+    }
+
+    if (Array.isArray(transcriptJson)) {
+      console.log("transcriptJson PREVIEW:", transcriptJson.slice(0, 3));
+    } else {
+      console.error(" transcriptJson is not an array:", transcriptJson);
+    }
+    
+    if (!Array.isArray(transcriptJson)) {
+      console.error("transcriptJson is not an array:", transcriptJson);
+      return res.status(500).json({ error: "Transcript JSON is invalid" });
+    }
+    console.log("Final transcriptJson count:", transcriptJson.length);
+
+    if (Array.isArray(transcriptJson)) {
+      console.log("is array?", Array.isArray(transcriptJson));
+    } else {
+      console.error("transcriptJson is not an array:", transcriptJson);
+    }
 
     console.log('Saving episode with:', {
       scriptLength: script.length,
@@ -292,13 +314,6 @@ exports.fullUploadEpisode = async (req, res) => {
     
     // save episode to DB
     console.log("Final transcriptJson count:", transcriptJson.length);
-
-    // const result = await pool.query(
-    //   `INSERT INTO episodes (podcast_id, name, description, audio_url, release_date, duration, script, transcript_json, picture_url)
-    //   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    //   RETURNING id`,
-    //   [podcast_id, name, description, audioUrl, release_date, duration, script, JSON.stringify(transcriptJson), picture_url]
-    // );
     console.log("transcriptJson preview before insert:", transcriptJson.slice(0, 2));
     console.log("type:", typeof transcriptJson);
     console.log("isArray:", Array.isArray(transcriptJson));
@@ -312,7 +327,8 @@ exports.fullUploadEpisode = async (req, res) => {
       duration,
       script,
       transcript_json: transcriptJson,
-      release_date
+      release_date,
+      language
     });
     
     // add speakers

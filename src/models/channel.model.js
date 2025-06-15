@@ -1,8 +1,6 @@
 const pool = require('../../db');
 
-// --- PODCASTS ---
-
-// fully done 
+// podcasts
 exports.insertPodcast = async (accountId, name, description, picture_url, category_ids = []) => {
   const channelRes = await pool.query(
     `SELECT id FROM channelprofile WHERE account_id = $1`,
@@ -35,7 +33,6 @@ exports.insertPodcast = async (accountId, name, description, picture_url, catego
   return podcast;
 };
 
-// fully done
 exports.getPodcastsByChannel = async (accountId) => {
   const result = await pool.query(
     `
@@ -50,7 +47,6 @@ exports.getPodcastsByChannel = async (accountId) => {
   return result.rows;
 };
 
-// fully done
 exports.getPodcast = async (podcastId, accountId) => {
   const result = await pool.query(
     `
@@ -81,7 +77,6 @@ exports.getPodcast = async (podcastId, accountId) => {
   return result.rows[0];
 };
 
-// fully done
 exports.updatePodcastById = async (podcastId, accountId, updates) => {
   const { name, description, picture_url, category_ids } = updates;
 
@@ -116,7 +111,6 @@ exports.updatePodcastById = async (podcastId, accountId, updates) => {
   return podcast;
 };
 
-// fully done 
 exports.deletePodcastById = async (podcastId, accountId) => {
   const checkRes = await pool.query(
     `SELECT p.id
@@ -134,6 +128,7 @@ exports.deletePodcastById = async (podcastId, accountId) => {
   const episodeIds = episodeRes.rows.map(row => row.id);
 
   for (const episodeId of episodeIds) {
+    await pool.query(`DELETE FROM ad_play_logs WHERE episode_id = $1`, [episodeId]);
     await pool.query(`DELETE FROM episode_likes WHERE episode_id = $1`, [episodeId]);
     await pool.query(`DELETE FROM reviews WHERE episode_id = $1`, [episodeId]);
     await pool.query(`DELETE FROM recentlyplayed WHERE episode_id = $1`, [episodeId]);
@@ -151,8 +146,7 @@ exports.deletePodcastById = async (podcastId, accountId) => {
   return true;
 };
 
-// --- EPISODES ---
-// fully done
+// episodes
 exports.getPodcastEpisodes = async (podcastId, accountId) => {
   const result = await pool.query(
     `SELECT e.id, e.name, e.picture_url, e.duration, e.release_date
@@ -167,14 +161,52 @@ exports.getPodcastEpisodes = async (podcastId, accountId) => {
 };
 
 exports.getEpisode = async (episodeId, accountId) => {
-  const result = await pool.query(
-    `SELECT e.*
-     FROM episodes e
-     JOIN podcasts p ON e.podcast_id = p.id
-     WHERE e.id = $1 AND p.channel_account_id = $2`,
-    [episodeId, accountId]
-  );
-  return result.rows[0];
+  const episodeQuery = `
+    SELECT e.*, 
+           COALESCE(like_count.count, 0) AS like_count,
+           COALESCE(avg_reviews.avg_rating, 0) AS avg_rating
+    FROM episodes e
+    JOIN podcasts p ON e.podcast_id = p.id
+    JOIN channelprofile c ON p.channel_id = c.id
+    LEFT JOIN (
+      SELECT episode_id, COUNT(*) AS count
+      FROM episode_likes
+      WHERE liked = true
+      GROUP BY episode_id
+    ) AS like_count ON e.id = like_count.episode_id
+    LEFT JOIN (
+      SELECT episode_id, ROUND(AVG(rating), 2) AS avg_rating
+      FROM reviews
+      GROUP BY episode_id
+    ) AS avg_reviews ON e.id = avg_reviews.episode_id
+    WHERE e.id = $1 AND c.account_id = $2
+  `;
+  const episodeResult = await pool.query(episodeQuery, [episodeId, accountId]);
+  if (episodeResult.rows.length === 0) return null;
+
+  const episode = episodeResult.rows[0];
+
+  const speakersQuery = `
+    SELECT s.name
+    FROM speakers s
+    JOIN episode_speakers es ON s.id = es.speaker_id
+    WHERE es.episode_id = $1
+  `;
+  const speakersResult = await pool.query(speakersQuery, [episodeId]);
+  episode.speakers = speakersResult.rows.map(r => r.name);
+
+  const reviewsQuery = `
+    SELECT r.id, r.comment_text, r.rating, r.created_at,
+           CONCAT(u.first_name, ' ', u.last_name) AS user_name
+    FROM reviews r
+    JOIN userprofile u ON r.account_id = u.account_id
+    WHERE r.episode_id = $1
+    ORDER BY r.created_at DESC
+  `;
+  const reviewsResult = await pool.query(reviewsQuery, [episodeId]);
+  episode.reviews = reviewsResult.rows;
+
+  return episode;
 };
 
 exports.updateEpisodeById = async (episodeId, accountId, updates) => {
@@ -191,35 +223,103 @@ exports.updateEpisodeById = async (episodeId, accountId, updates) => {
 };
 
 exports.deleteEpisodeById = async (episodeId, accountId) => {
-  const result = await pool.query(
-    `DELETE FROM episodes
-     USING podcasts p
-     WHERE episodes.podcast_id = p.id
-       AND episodes.id = $1
-       AND p.channel_account_id = $2
-     RETURNING episodes.*`,
-    [episodeId, accountId]
-  );
-  return result.rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const checkOwner = await client.query(
+      `SELECT e.id FROM episodes e
+       JOIN podcasts p ON e.podcast_id = p.id
+       JOIN channelprofile c ON p.channel_id = c.id
+       WHERE e.id = $1 AND c.account_id = $2`,
+      [episodeId, accountId]
+    );
+    if (checkOwner.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    await client.query(`DELETE FROM episode_likes WHERE episode_id = $1`, [episodeId]);
+    await client.query(`DELETE FROM reviews WHERE episode_id = $1`, [episodeId]);
+    await client.query(`DELETE FROM recentlyplayed WHERE episode_id = $1`, [episodeId]);
+    await client.query(`DELETE FROM ad_play_logs WHERE episode_id = $1`, [episodeId]);
+    await client.query(`DELETE FROM episode_speakers WHERE episode_id = $1`, [episodeId]);
+
+    const result = await client.query(
+      `DELETE FROM episodes WHERE id = $1 RETURNING *`,
+      [episodeId]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Delete episode failed:', err);
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
-// --- PROFILE ---
+// profile
 exports.getChannelProfileByAccountId = async (accountId) => {
   const result = await pool.query(
-    `SELECT * FROM channelprofile WHERE account_id = $1`,
+    `SELECT 
+      c.*,
+      a.email,
+      a.phone,
+      (
+        SELECT COUNT(*) FROM podcasts p WHERE p.channel_id = c.id
+      ) AS total_podcasts,
+      (
+        SELECT COUNT(*) FROM episodes e
+        JOIN podcasts p ON e.podcast_id = p.id
+        WHERE p.channel_id = c.id
+      ) AS total_episodes,
+      (
+        SELECT COUNT(*) FROM podcast_saves ps
+        JOIN podcasts p ON ps.podcast_id = p.id
+        WHERE p.channel_id = c.id
+      ) AS total_saved_podcasts,
+      (
+        SELECT COUNT(*) FROM episode_likes el
+        JOIN episodes e ON el.episode_id = e.id
+        JOIN podcasts p ON e.podcast_id = p.id
+        WHERE p.channel_id = c.id
+      ) AS total_liked_episodes
+    FROM channelprofile c
+    JOIN accounts a ON c.account_id = a.id
+    WHERE c.account_id = $1;`,
     [accountId]
   );
   return result.rows[0];
 };
 
 exports.updateChannelProfileByAccountId = async (accountId, updates) => {
-  const { name, description, image } = updates;
-  await pool.query(
-    `UPDATE channelprofile
-     SET name = COALESCE($1, name),
-         description = COALESCE($2, description),
-         image = COALESCE($3, image)
-     WHERE account_id = $4`,
-    [name, description, image, accountId]
-  );
+  const { channel_name, channel_description, phone } = updates;
+
+  await pool.query('BEGIN');
+
+  try {
+    await pool.query(
+      `UPDATE channelprofile
+       SET channel_name = COALESCE($1, channel_name),
+           channel_description = COALESCE($2, channel_description)
+       WHERE account_id = $3`,
+      [channel_name, channel_description, accountId]
+    );
+
+    await pool.query(
+      `UPDATE accounts
+       SET phone = COALESCE($1, phone)
+       WHERE id = $2`,
+      [phone, accountId]
+    );
+
+    await pool.query('COMMIT');
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    throw err;
+  }
 };

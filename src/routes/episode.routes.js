@@ -10,7 +10,7 @@ const {
     getEpisodeLikeStatus,
     getLikedEpisodes,
     generateScript,
-    fullUploadEpisode 
+    fullUploadEpisode ,
   } = require('../controllers/episode.controller');
 
 const { verifyToken } = require('../middlewares/auth.middleware');

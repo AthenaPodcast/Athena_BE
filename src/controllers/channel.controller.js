@@ -1,14 +1,44 @@
 const pool = require('../../db');
-const { streamUpload } = require('../utils/cloudinaryUpload');
 const { transcribeAudioFromUrl } = require('../utils/transcribe');
-const ffmpeg = require('fluent-ffmpeg');
-const { getPodcastEpisodes, getEpisode, updateEpisodeById, deleteEpisodeById, getPodcastsByChannel, getPodcast, insertPodcast, updatePodcastById, deletePodcastById, getChannelProfileByAccountId, updateChannelProfileByAccountId } = require('../models/channel.model');
+const { streamUpload } = require('../utils/cloudinaryUpload');
 const { createEpisode } = require('../models/episode.model');
+const path = require('path');
+
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
 const fs = require('fs');
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfprobePath(ffprobeInstaller.path);
+
+const { 
+  getPodcastEpisodes, 
+  getEpisode, 
+  updateEpisodeById, 
+  deleteEpisodeById, 
+  getPodcastsByChannel, 
+  getPodcast, 
+  insertPodcast, 
+  updatePodcastById, 
+  deletePodcastById, 
+  getChannelProfileByAccountId, 
+  updateChannelProfileByAccountId,
+} = require('../models/channel.model');
+
 
 exports.createPodcast = async (req, res) => {
   const accountId = req.user.accountId;
-  const { name, description, picture_url, category_ids } = req.body;
+  let { name, description, category_ids } = req.body;
+
+  if (typeof category_ids === 'string') {
+    try {
+      category_ids = JSON.parse(category_ids);
+    } catch {
+      category_ids = [];
+    }
+  }
+  const picture_url = req.file?.filename || null;
 
   try {
     const result = await insertPodcast(accountId, name, description, picture_url, category_ids);
@@ -42,7 +72,27 @@ exports.getPodcastById = async (req, res) => {
 
 exports.updatePodcast = async (req, res) => {
   try {
-    const updated = await updatePodcastById(req.params.id, req.user.accountId, req.body);
+    const podcastId = parseInt(req.params.id);
+    const accountId = req.user.accountId;
+
+    let { name, description, category_ids } = req.body;
+
+    if (typeof category_ids === 'string') {
+      try {
+        category_ids = JSON.parse(category_ids);
+      } catch {
+        category_ids = [];
+      }
+    }
+    const picture_url = req.file?.filename || null;
+
+    const updated = await updatePodcastById(podcastId, accountId, {
+      name,
+      description,
+      picture_url,
+      category_ids
+    });
+
     if (!updated) return res.status(403).json({ message: 'Not found or unauthorized' });
     res.json({ message: 'Updated successfully' });
   } catch (err) {
@@ -72,70 +122,46 @@ exports.getEpisodesByPodcast = async (req, res) => {
   }
 };
 
-// exports.fullUploadEpisodeChannel = async (req, res) => {
-//   try {
-//     let { name, description, release_date, picture_url, speakers } = req.body;
-//     const audioFile = req.file;
-//     const podcast_id = req.params.podcastId;
-
-//     if (!audioFile) return res.status(400).json({ error: 'Audio file is required' });
-
-//     if (typeof speakers === 'string') {
-//       speakers = speakers.split(',').map(s => s.trim());
-//     }
-//     if (!Array.isArray(speakers)) speakers = [];
-
-//     const audioResult = await streamUpload(audioFile.buffer, 'episods');
-//     const audioUrl = audioResult.secure_url;
-
-//     const duration = await new Promise((resolve, reject) => {
-//       ffmpeg.ffprobe(audioUrl, (err, metadata) => {
-//         if (err) return reject(err);
-//         resolve(Math.floor(metadata.format.duration));
-//       });
-//     });
-
-//     const { script, transcriptjson } = await transcribeAudioFromUrl(audioUrl);
-
-
-//     const episode = await createEpisode({
-//       podcast_id,
-//       name,
-//       description,
-//       picture_url,
-//       audio_url: audioUrl,
-//       duration,
-//       script,
-//       transcript_json: transcriptjson,
-//       release_date
-//     });
-
-//     res.status(201).json({ message: 'Episode uploaded', episode });
-//   } catch (err) {
-//     console.error('Upload episode error:', err);
-//     res.status(500).json({ error: 'Internal Server Error' });
-//   }
-// };
-
-exports.fullUploadEpisodeChannel = async (req, res) => {
+exports.fullUploadEpisode = async (req, res) => {
   try {
-    let { name, description, release_date, picture_url, speakers, language } = req.body;
-    const audioFile = req.file;
-    const podcast_id = req.params.podcastId;
+    let { name, description, release_date, speakers, language } = req.body;
+    const { id: podcast_id } = req.params;
 
-    if (!audioFile) return res.status(400).json({ error: 'Audio file is required' });
+    const imageFile = req.files?.image?.[0];
+    const audioFile = req.files?.audio?.[0];
 
-    // Normalize speakers input
-    if (typeof speakers === 'string') {
-      speakers = speakers.split(',').map(s => s.trim()).filter(s => s);
+    let picture_url = null;
+    if (imageFile) {
+      const ext = path.extname(imageFile.originalname);
+      const filename = `profile_${Date.now()}${ext}`;
+      const filePath = path.join('uploads', filename);
+      fs.writeFileSync(filePath, imageFile.buffer);
+      picture_url = filename;
     }
-    if (!Array.isArray(speakers)) speakers = [];
 
-    // Upload to Cloudinary
-    const audioResult = await streamUpload(audioFile.buffer, 'episods');
-    const audioUrl = audioResult.secure_url;
+    if (!audioFile || !audioFile.buffer) {
+      return res.status(400).json({ error: 'Audio file is required' });
+    }
 
-    // Extract duration
+    const audioUrl = (await streamUpload(audioFile.buffer, 'episods')).secure_url;
+
+    if (req.user.type !== 'channel') {
+      return res.status(403).json({ error: 'Only channel accounts can upload episodes' });
+    }
+
+    if (!audioFile) {
+      return res.status(400).json({ error: 'Audio file is required' });
+    }
+   
+
+    if (typeof speakers === 'string') {
+      speakers = speakers.split(',').map(name => name.trim()).filter(name => name.length > 0);
+    }
+    if (!Array.isArray(speakers)) {
+      speakers = [];
+    }
+
+    // extract duration of audio with FFmpeg
     const duration = await new Promise((resolve, reject) => {
       ffmpeg.ffprobe(audioUrl, (err, metadata) => {
         if (err) return reject(err);
@@ -143,10 +169,48 @@ exports.fullUploadEpisodeChannel = async (req, res) => {
       });
     });
 
-    // Transcribe
-    const { script, transcriptJson } = await transcribeAudioFromUrl(audioUrl);
+    // transcribe audio
+    const { script, transcript_json: transcriptJson, language: detectedLanguage } = await transcribeAudioFromUrl(audioUrl);
+    
+    if (!language) {
+      language = detectedLanguage || 'unknown';
+    }
 
-    // Insert episode
+    if (!description || description.trim() === '') {
+      const shortDescription = script.split(' ').slice(0, 30).join(' ') + '...';
+      description = shortDescription;
+    }
+
+    if (Array.isArray(transcriptJson)) {
+      console.log("transcriptJson PREVIEW:", transcriptJson.slice(0, 3));
+    } else {
+      console.error(" transcriptJson is not an array:", transcriptJson);
+    }
+    
+    if (!Array.isArray(transcriptJson)) {
+      console.error("transcriptJson is not an array:", transcriptJson);
+      return res.status(500).json({ error: "Transcript JSON is invalid" });
+    }
+    console.log("Final transcriptJson count:", transcriptJson.length);
+
+    if (Array.isArray(transcriptJson)) {
+      console.log("is array?", Array.isArray(transcriptJson));
+    } else {
+      console.error("transcriptJson is not an array:", transcriptJson);
+    }
+
+    console.log('Saving episode with:', {
+      scriptLength: script.length,
+      wordCount: transcriptJson.length,
+      firstWord: transcriptJson[0],
+    });
+    
+    // save episode to DB
+    console.log("Final transcriptJson count:", transcriptJson.length);
+    console.log("transcriptJson preview before insert:", transcriptJson.slice(0, 2));
+    console.log("type:", typeof transcriptJson);
+    console.log("isArray:", Array.isArray(transcriptJson));
+    
     const episode = await createEpisode({
       podcast_id,
       name,
@@ -157,38 +221,55 @@ exports.fullUploadEpisodeChannel = async (req, res) => {
       script,
       transcript_json: transcriptJson,
       release_date,
-      language,
+      language
     });
-
-    // Save speakers
+    
+    // add speakers
     for (let speakerName of speakers) {
+      speakerName = speakerName.trim();
+
       const speakerRes = await pool.query(
-        `INSERT INTO speakers (name)
-         VALUES ($1)
-         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-         RETURNING id`,
+        `SELECT id FROM speakers WHERE name = $1`,
         [speakerName]
       );
 
-      const speakerId = speakerRes.rows[0].id;
+      let speakerId;
+      if (speakerRes.rows.length > 0) {
+        speakerId = speakerRes.rows[0].id;
+      } else {
+        const insertRes = await pool.query(
+          `INSERT INTO speakers (name) VALUES ($1) RETURNING id`,
+          [speakerName]
+        );
+        speakerId = insertRes.rows[0].id;
+      }
 
       await pool.query(
-        `INSERT INTO episode_speakers (episode_id, speaker_id)
-         VALUES ($1, $2)
-         ON CONFLICT DO NOTHING`,
+        `INSERT INTO episode_speakers (episode_id, speaker_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
         [episode.id, speakerId]
       );
     }
 
-    // Return response
+    // clean up 
+    if (audioFile.path && fs.existsSync(audioFile.path)) {
+      fs.unlinkSync(audioFile.path);
+    }
+
     res.status(201).json({
       message: 'Episode uploaded and transcribed successfully',
-      episode,
+      episode_id: episode.id,
+      picture_url,
+      audio_url: episode.audio_url,
+      duration: episode.duration,
+      script: episode.script,
+      transcript_json: episode.transcript_json,
+      language,
+      description,
+      speakers
     });
-
   } catch (err) {
-    console.error('Upload episode error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('fullUploadEpisode error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
