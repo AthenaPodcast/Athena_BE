@@ -8,6 +8,9 @@ const {
   deleteUserInterests,
   markProfileComplete,
   getFullProfileInfo,
+  getProfileSummary,
+  AllLikedEpisodes,
+  AllSavedPodcasts
 } = require('../models/userProfile.model');
 
 const completeProfile = async (req, res) => {
@@ -199,12 +202,47 @@ const editUserProfile = async (req, res) => {
   }
 };
 
+const getProfileSummaryLiked = async (req, res) => {
+  const accountId = req.user.accountId;
+  try {
+    const data = await getProfileSummary(accountId);
+    res.status(200).json(data);
+  } catch (err) {
+    console.error('Error in profile summary:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getAllLikedEpisodes = async (req, res) => {
+  const accountId = req.user.accountId;
+  try {
+    const liked = await AllLikedEpisodes(accountId);
+    res.status(200).json(liked);
+  } catch (err) {
+    console.error('Error fetching liked episodes:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getAllSavedPodcasts = async (req, res) => {
+  const accountId = req.user.accountId;
+  try {
+    const saved = await AllSavedPodcasts(accountId);
+    res.status(200).json(saved);
+  } catch (err) {
+    console.error('Error fetching saved podcasts:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 module.exports = {
     completeProfile,
     uploadProfilePicture,
     saveUserInterests,
     isProfileComplete,
     getUserProfile,
-    editUserProfile
+    editUserProfile,
+    getProfileSummaryLiked,
+    getAllLikedEpisodes,
+    getAllSavedPodcasts
 };
   

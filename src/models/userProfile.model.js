@@ -15,7 +15,6 @@ const updateProfileInfo = async (accountId, gender, age, birthDate) => {
     );
 };
 
-
 const updateProfilePicture = async (accountId, filePath) => {
     await pool.query(
       `UPDATE UserProfile SET profile_picture = $1 WHERE account_id = $2`,
@@ -89,6 +88,72 @@ const getFullProfileInfo = async (accountId) => {
   return result.rows[0];
 };
 
+const getProfileSummary = async (accountId) => {
+  const client = await pool.connect();
+  try {
+    const likedEpisodesRes = await client.query(`
+      SELECT e.id, e.name, e.picture_url
+      FROM episode_likes el
+      JOIN episodes e ON e.id = el.episode_id
+      WHERE el.account_id = $1 AND el.liked = true
+      ORDER BY el.episode_id DESC
+      LIMIT 3
+    `, [accountId]);
+
+    const likedCountRes = await client.query(`
+      SELECT COUNT(*) FROM episode_likes
+      WHERE account_id = $1 AND liked = true
+    `, [accountId]);
+
+    const savedPodcastsRes = await client.query(`
+      SELECT p.id, p.name, p.picture_url
+      FROM podcast_saves ps
+      JOIN podcasts p ON p.id = ps.podcast_id
+      WHERE ps.account_id = $1 AND ps.saved = true
+      ORDER BY ps.podcast_id DESC
+      LIMIT 3
+    `, [accountId]);
+
+    const savedCountRes = await client.query(`
+      SELECT COUNT(*) FROM podcast_saves
+      WHERE account_id = $1 AND saved = true
+    `, [accountId]);
+
+    return {
+      liked_episodes_count: parseInt(likedCountRes.rows[0].count, 10),
+      liked_episodes: likedEpisodesRes.rows,
+      saved_podcasts_count: parseInt(savedCountRes.rows[0].count, 10),
+      saved_podcasts: savedPodcastsRes.rows,
+    };
+  } finally {
+    client.release();
+  }
+};
+
+const AllLikedEpisodes = async (accountId) => {
+  const result = await pool.query(`
+    SELECT e.id, e.name, e.picture_url
+    FROM episode_likes el
+    JOIN episodes e ON e.id = el.episode_id
+    WHERE el.account_id = $1 AND el.liked = true
+    ORDER BY el.episode_id DESC
+  `, [accountId]);
+
+  return result.rows;
+};
+
+const AllSavedPodcasts = async (accountId) => {
+  const result = await pool.query(`
+    SELECT p.id, p.name, p.picture_url
+    FROM podcast_saves ps
+    JOIN podcasts p ON p.id = ps.podcast_id
+    WHERE ps.account_id = $1 AND ps.saved = true
+    ORDER BY ps.podcast_id DESC
+  `, [accountId]);
+
+  return result.rows;
+};
+
 module.exports = {
   createUserProfile,
   updateProfileInfo,
@@ -96,7 +161,10 @@ module.exports = {
   insertUserInterests,
   deleteUserInterests,
   markProfileComplete,
-  getFullProfileInfo
+  getFullProfileInfo,
+  getProfileSummary,
+  AllLikedEpisodes,
+  AllSavedPodcasts
 };
 
 
