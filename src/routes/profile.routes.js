@@ -4,7 +4,9 @@ const {
     completeProfile,
     uploadProfilePicture,
     saveUserInterests, 
-    isProfileComplete
+    isProfileComplete,
+    getUserProfile,
+    editUserProfile
   } = require('../controllers/profile.controller');
 const { verifyToken } = require('../middlewares/auth.middleware'); 
 const upload = require('../config/imageMulter');
@@ -34,5 +36,10 @@ router.delete('/interests', verifyToken, async (req, res) => {
   });
   
 router.get('/is-complete', verifyToken, isProfileComplete);
+
+router.get('/', verifyToken, getUserProfile);
+
+router.put('/edit', verifyToken, upload.single('profileImage'), editUserProfile);
+
 
 module.exports = router;
