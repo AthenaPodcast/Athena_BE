@@ -9,7 +9,8 @@ const {
   getEpisodeLike,
   getLikedEpisodes,
   countLikedEpisodes,
-  updateEpisodeScript 
+  updateEpisodeScript,
+  getPaginatedLatestEpisodes 
  } = require('../models/episode.model');
  
 const { transcribeAudioFromUrl } = require('../utils/transcribe');
@@ -373,5 +374,24 @@ exports.fullUploadEpisode = async (req, res) => {
   } catch (err) {
     console.error('fullUploadEpisode error:', err);
     return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+exports.getLatestEpisodes = async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 9;
+
+  try {
+    const { episodes, total_pages, total_count } = await getPaginatedLatestEpisodes(page, limit);
+    res.status(200).json({
+      page,
+      limit,
+      total_pages,
+      total_count,
+      episodes
+    });
+  } catch (err) {
+    console.error('Error fetching latest episodes:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };

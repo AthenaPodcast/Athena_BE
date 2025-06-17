@@ -233,6 +233,31 @@ const getPreviousEpisode = async (episodeId) => {
   return result.rows[0];
 };
 
+const getPaginatedLatestEpisodes = async (page, limit) => {
+  const offset = (page - 1) * limit;
+
+  const data = await pool.query(`
+    SELECT e.id, e.name, e.picture_url, e.created_at,
+           p.name AS podcast_name
+    FROM episodes e
+    JOIN podcasts p ON p.id = e.podcast_id
+    ORDER BY e.created_at DESC
+    LIMIT $1 OFFSET $2
+  `, [limit, offset]);
+
+  // get total count
+  const countResult = await pool.query(`SELECT COUNT(*) FROM episodes`);
+  const totalCount = parseInt(countResult.rows[0].count, 10);
+  const totalPages = Math.ceil(totalCount / limit);
+
+  return {
+    episodes: data.rows,
+    total_pages: totalPages,
+    total_count: totalCount
+  };
+};
+
+
 module.exports = {
   createEpisode,
   getEpisodesByPodcastId,
@@ -244,5 +269,6 @@ module.exports = {
   updateEpisodeScript,
   getEpisodeById,
   getRecommendationsByCategory,
-  getPreviousEpisode
+  getPreviousEpisode,
+  getPaginatedLatestEpisodes
 };
