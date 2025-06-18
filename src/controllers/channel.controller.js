@@ -24,7 +24,11 @@ const {
   deletePodcastById, 
   getChannelProfileByAccountId, 
   updateChannelProfileByAccountId,
-  getChannelsByCategories 
+  getChannelsByCategories,
+  getChannelInfoById,
+  getPaginatedPodcastsUnderChannel,
+  getPublicPodcast,
+  getPublicPodcastEpisodesPaginated   
 } = require('../models/channel.model');
 
 
@@ -94,6 +98,103 @@ exports.getAllRegularChannels = async (req, res) => {
   } catch (err) {
     console.error('Error fetching regular channels:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getChannelById = async (req, res) => {
+  const channelId = parseInt(req.params.id);
+  if (isNaN(channelId)) {
+    return res.status(400).json({ message: 'Invalid channel ID' });
+  }
+
+  try {
+    const channel = await getChannelInfoById(channelId);
+    if (!channel) {
+      return res.status(404).json({ message: 'Channel not found' });
+    }
+
+    res.status(200).json(channel);
+  } catch (err) {
+    console.error('Error fetching channel by ID:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getPodcastsByChannelId = async (req, res) => {
+  const channelId = parseInt(req.params.id);
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 6;
+
+  if (isNaN(channelId)) {
+    return res.status(400).json({ message: 'Invalid channel ID' });
+  }
+
+  try {
+    const result = await getPaginatedPodcastsUnderChannel(channelId, page, limit);
+    res.status(200).json(result);
+  } catch (err) {
+    console.error('Error fetching paginated podcasts:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getPublicPodcastById = async (req, res) => {
+  try {
+    const podcast = await getPublicPodcast(req.params.id, req.user.accountId);
+    if (!podcast) return res.status(403).json({ message: 'Not found or unauthorized' });
+    res.json(podcast);
+  } catch (err) {
+    console.error('Get podcast error:', err);
+    res.status(500).json({ message: 'Failed to fetch podcast' });
+  }
+};
+
+exports.getPublicPodcastEpisodes = async (req, res) => {
+  const podcastId = parseInt(req.params.id);
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 6;
+
+  if (isNaN(podcastId)) {
+    return res.status(400).json({ message: 'Invalid podcast ID' });
+  }
+
+  try {
+    const result = await getPublicPodcastEpisodesPaginated(podcastId, page, limit);
+    res.status(200).json(result);
+  } catch (err) {
+    console.error('Error fetching podcast episodes:', err);
+    res.status(500).json({ message: 'Server error fetching episodes' });
+  }
+};
+
+exports.toggleSavePodcast = async (req, res) => {
+  const podcastId = parseInt(req.params.id);
+  const accountId = req.user.accountId;
+
+  try {
+    const check = await pool.query(
+      `SELECT saved FROM podcast_saves WHERE account_id = $1 AND podcast_id = $2`,
+      [accountId, podcastId]
+    );
+
+    if (check.rows.length > 0) {
+      const newStatus = !check.rows[0].saved;
+      await pool.query(
+        `UPDATE podcast_saves SET saved = $1 WHERE account_id = $2 AND podcast_id = $3`,
+        [newStatus, accountId, podcastId]
+      );
+      return res.json({ is_saved: newStatus });
+    }
+
+    await pool.query(
+      `INSERT INTO podcast_saves (account_id, podcast_id, saved) VALUES ($1, $2, true)`,
+      [accountId, podcastId]
+    );
+    res.json({ is_saved: true });
+
+  } catch (err) {
+    console.error('Toggle save failed:', err);
+    res.status(500).json({ message: 'Failed to toggle podcast save' });
   }
 };
 

@@ -65,6 +65,165 @@ exports.getChannelsByCategories = async (isExternal, categoryIds, page, limit) =
   };
 };
 
+exports.getChannelInfoById = async (channelId) => {
+  const result = await pool.query(`
+    SELECT 
+      cp.id,
+      cp.channel_name,
+      cp.channel_picture,
+      cp.channel_description,
+      cp.created_by_admin AS is_external,
+      COUNT(p.id) AS podcast_count
+    FROM channelprofile cp
+    LEFT JOIN podcasts p ON p.channel_id = cp.id
+    WHERE cp.id = $1
+    GROUP BY cp.id
+  `, [channelId]);
+
+  if (result.rows.length === 0) return null;
+
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    name: row.channel_name,
+    picture: row.channel_picture,
+    description: row.channel_description,
+    type: row.is_external ? 'external' : 'regular',
+    podcast_count: parseInt(row.podcast_count, 10)
+  };
+};
+
+exports.getPaginatedPodcastsUnderChannel = async (channelId, page, limit) => {
+  const offset = (page - 1) * limit;
+
+  // 1. Paginated query
+  const result = await pool.query(`
+    SELECT 
+      p.id,
+      p.name,
+      p.picture_url,
+      cp.created_by_admin AS is_external
+    FROM podcasts p
+    JOIN channelprofile cp ON cp.id = p.channel_id
+    WHERE cp.id = $1
+    ORDER BY p.id DESC
+    LIMIT $2 OFFSET $3
+  `, [channelId, limit, offset]);
+
+  // 2. Count total
+  const countRes = await pool.query(`
+    SELECT COUNT(*) FROM podcasts WHERE channel_id = $1
+  `, [channelId]);
+
+  const totalCount = parseInt(countRes.rows[0].count, 10);
+  const totalPages = Math.ceil(totalCount / limit);
+
+  const podcasts = result.rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    picture_url: row.picture_url,
+    type: row.is_external ? 'external' : 'regular'
+  }));
+
+  return {
+    page,
+    limit,
+    total_count: totalCount,
+    total_pages: totalPages,
+    podcasts
+  };
+};
+
+exports.getPublicPodcast = async (podcastId, accountId) => {
+  const result = await pool.query(
+    `
+    WITH unique_categories AS (
+      SELECT DISTINCT c.id, c.name
+      FROM podcastcategory pc
+      JOIN categories c ON pc.category_id = c.id
+      WHERE pc.podcast_id = $1
+    )
+    SELECT 
+      p.*, 
+      (
+        SELECT json_agg(json_build_object('id', uc.id, 'name', uc.name))
+        FROM unique_categories uc
+      ) AS categories,
+      COUNT(DISTINCT e.id) AS total_episodes,
+      COUNT(DISTINCT ps.account_id) AS total_saves,
+      COALESCE(array_agg(DISTINCT e.language) FILTER (WHERE e.language IS NOT NULL), '{}') AS episode_languages,
+      cp.created_by_admin AS is_external,
+      EXISTS (
+        SELECT 1 FROM podcast_saves s
+        WHERE s.podcast_id = p.id AND s.account_id = $2 AND s.saved = true
+      ) AS is_saved
+    FROM podcasts p
+    LEFT JOIN episodes e ON e.podcast_id = p.id
+    LEFT JOIN podcast_saves ps ON ps.podcast_id = p.id AND ps.saved = true
+    JOIN channelprofile cp ON p.channel_id = cp.id
+    WHERE p.id = $1
+    GROUP BY p.id, cp.created_by_admin
+    `,
+    [podcastId, accountId]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    ...row,
+    type: row.is_external ? 'external' : 'regular',
+    is_saved: row.is_saved
+  };
+};
+
+exports.getPublicPodcastEpisodesPaginated = async (podcastId, page = 1, limit = 6) => {
+  const offset = (page - 1) * limit;
+
+  const data = await pool.query(
+    `
+    SELECT 
+      e.id, 
+      e.name, 
+      e.picture_url, 
+      e.duration, 
+      e.release_date,
+      cp.created_by_admin AS is_external
+    FROM episodes e
+    JOIN podcasts p ON e.podcast_id = p.id
+    JOIN channelprofile cp ON p.channel_id = cp.id
+    WHERE p.id = $1
+    ORDER BY e.release_date DESC
+    LIMIT $2 OFFSET $3
+    `,
+    [podcastId, limit, offset]
+  );
+
+  const countRes = await pool.query(
+    `SELECT COUNT(*) FROM episodes WHERE podcast_id = $1`,
+    [podcastId]
+  );
+
+  const totalCount = parseInt(countRes.rows[0].count, 10);
+  const totalPages = Math.ceil(totalCount / limit);
+
+  const episodes = data.rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    picture_url: row.picture_url,
+    duration: row.duration,
+    release_date: row.release_date,
+    type: row.is_external ? 'external' : 'regular'
+  }));
+
+  return {
+    page,
+    limit,
+    total_count: totalCount,
+    total_pages: totalPages,
+    episodes
+  };
+};
 
 exports.getPodcastsByChannel = async (accountId) => {
   const result = await pool.query(

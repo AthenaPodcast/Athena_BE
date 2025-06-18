@@ -10,7 +10,8 @@ const {
   getLikedEpisodes,
   countLikedEpisodes,
   updateEpisodeScript,
-  getPaginatedLatestEpisodes 
+  getPaginatedLatestEpisodes,
+  getPublicEpisode 
  } = require('../models/episode.model');
  
 const { transcribeAudioFromUrl } = require('../utils/transcribe');
@@ -393,5 +394,24 @@ exports.getLatestEpisodes = async (req, res) => {
   } catch (err) {
     console.error('Error fetching latest episodes:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getPublicEpisodeById = async (req, res) => {
+  const episodeId = parseInt(req.params.id);
+  const accountId = req.user.accountId;
+
+  if (isNaN(episodeId)) {
+    return res.status(400).json({ message: 'Invalid episode ID' });
+  }
+
+  try {
+    const episode = await getPublicEpisode(episodeId, accountId);
+    if (!episode) return res.status(404).json({ message: 'Episode not found' });
+
+    res.json(episode);
+  } catch (err) {
+    console.error('Error fetching public episode:', err);
+    res.status(500).json({ message: 'Failed to fetch episode' });
   }
 };
