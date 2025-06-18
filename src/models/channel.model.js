@@ -33,6 +33,39 @@ exports.insertPodcast = async (accountId, name, description, picture_url, catego
   return podcast;
 };
 
+exports.getChannelsByCategories = async (isExternal, categoryIds, page, limit) => {
+  const offset = (page - 1) * limit;
+
+  const result = await pool.query(`
+    SELECT DISTINCT cp.*
+    FROM channelprofile cp
+    JOIN podcasts p ON p.channel_id = cp.id
+    JOIN podcastcategory pc ON pc.podcast_id = p.id
+    WHERE cp.created_by_admin = $1
+      AND pc.category_id = ANY($2)
+    LIMIT $3 OFFSET $4
+  `, [isExternal, categoryIds, limit, offset]);
+
+  const countResult = await pool.query(`
+    SELECT COUNT(DISTINCT cp.id) AS count
+    FROM channelprofile cp
+    JOIN podcasts p ON p.channel_id = cp.id
+    JOIN podcastcategory pc ON pc.podcast_id = p.id
+    WHERE cp.created_by_admin = $1
+      AND pc.category_id = ANY($2)
+  `, [isExternal, categoryIds]);
+
+  const totalCount = parseInt(countResult.rows[0].count, 10);
+  const totalPages = Math.ceil(totalCount / limit);
+
+  return {
+    channels: result.rows,
+    total_pages: totalPages,
+    total_count: totalCount
+  };
+};
+
+
 exports.getPodcastsByChannel = async (accountId) => {
   const result = await pool.query(
     `
