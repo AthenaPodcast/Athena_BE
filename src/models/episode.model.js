@@ -238,9 +238,11 @@ const getPaginatedLatestEpisodes = async (page, limit) => {
 
   const data = await pool.query(`
     SELECT e.id, e.name, e.picture_url, e.created_at,
-           p.name AS podcast_name
+           p.name AS podcast_name,
+           cp.created_by_admin AS is_external
     FROM episodes e
     JOIN podcasts p ON p.id = e.podcast_id
+    JOIN channelprofile cp ON cp.id = p.channel_id
     ORDER BY e.created_at DESC
     LIMIT $1 OFFSET $2
   `, [limit, offset]);
@@ -250,8 +252,13 @@ const getPaginatedLatestEpisodes = async (page, limit) => {
   const totalCount = parseInt(countResult.rows[0].count, 10);
   const totalPages = Math.ceil(totalCount / limit);
 
+  const episodes = data.rows.map(row => ({
+    ...row,
+    type: row.is_external ? 'external' : 'regular'
+  }));
+
   return {
-    episodes: data.rows,
+    episodes,
     total_pages: totalPages,
     total_count: totalCount
   };
