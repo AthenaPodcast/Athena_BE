@@ -22,6 +22,7 @@ const userRoutes = require('./src/routes/user.routes');
 const chatRoutes = require('./src/routes/chat.routes');
 const channelRoutes = require('./src/routes/channel.routes');
 const homeRoutes = require('./src/routes/home.routes');
+const categoryPage = require('./src/routes/category.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -39,5 +40,6 @@ app.use('/api/users', userRoutes);
 app.use('/api', chatRoutes);
 app.use('/api/channel', channelRoutes);
 app.use('/api/home', homeRoutes);
+app.use('/api/categories', categoryPage);
 
 module.exports = app;
