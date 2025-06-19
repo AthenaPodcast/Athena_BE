@@ -54,7 +54,7 @@ const signup = async (req, res) => {
     console.log('STEP 6: Creating verification token');
     const token = generateToken({ accountId });
 
-    const verificationLink = `http://localhost:${process.env.PORT || 3000}/api/auth/verify-email?token=${token}`;
+    const verificationLink = `http://10.0.2.2:${process.env.PORT || 3000}/api/auth/verify-email?token=${token}`;
 
     console.log('STEP 7: Sending verification email');
     try {
