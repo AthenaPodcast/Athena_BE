@@ -30,7 +30,7 @@ def fetch_user_context(user_id):
             return [row[0] for row in cur.fetchall()]
 
         # get mood first (before using it)
-        cur.execute("SELECT mood FROM moodtracker WHERE account_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
+        cur.execute("SELECT mood FROM moodtracker WHERE account_id = %s", (user_id,))
         row = cur.fetchone()
         mood = row[0] if row else None
 
@@ -96,12 +96,18 @@ def get_recommendations(user_id, override_mood=None):
     episodes, podcasts = fetch_content()
 
     mood = override_mood or user["mood"]
-    mood_tags = mood_to_categories.get(mood, [])
+    mood_cat_ids  = mood_to_categories.get(mood, [])
+    conn = get_connection()
+    with conn.cursor() as cur:
+        cur.execute("SELECT name FROM categories WHERE id = ANY(%s)", (mood_cat_ids,))
+        mood_category_names = [row[0] for row in cur.fetchall()]
+
     age_group = f"age_group_{(user['age'] // 10) * 10}s" if user['age'] else ""
     gender_tag = f"gender_{user['gender']}" if user['gender'] else ""
 
+    mood_category_names_weighted = mood_category_names * 3
     # build user preference text
-    user_text = " ".join(user["interests"] + mood_tags + [age_group, gender_tag])
+    user_text = " ".join(user["interests"] + mood_category_names_weighted + [age_group, gender_tag])
     
     ep_matches = episodes[episodes["id"].isin(user["liked_episodes"] + user["played_episodes"] + user["reviewed_episodes"])]
     user_text += " " + " ".join(ep_matches[["description", "script"]].fillna("").agg(" ".join, axis=1).tolist())
@@ -140,7 +146,7 @@ def get_recommendations(user_id, override_mood=None):
     top_eps = episodes.nlargest(3, "score")[["id", "name", "score"]].assign(type="episode")
     top_pods = podcasts.nlargest(2, "score")[["id", "name", "score"]].assign(type="podcast")
     result = pd.concat([top_eps, top_pods]).sort_values(by="score", ascending=False)
-
+    result = result.drop_duplicates(subset=["type", "id"], keep="first")
     return result[["type", "id", "name", "score"]].to_dict(orient="records")
 
 def boost_recent_score(score, created_at):

@@ -319,6 +319,17 @@ const getPublicEpisode = async (episodeId, accountId) => {
   `, [episodeId]);
   episode.reviews = reviewsResult.rows;
 
+  const progressResult = await pool.query(`
+    SELECT progress
+    FROM recentlyplayed
+    WHERE episode_id = $1 AND account_id = $2
+    `, [episodeId, accountId]);
+
+  const progressRow = progressResult.rows[0];
+  episode.progress = (!progressRow || progressRow.progress >= episode.duration)
+    ? 0
+    : progressRow.progress;
+
   return episode;
 };
 
