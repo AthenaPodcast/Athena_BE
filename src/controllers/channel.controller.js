@@ -69,7 +69,7 @@ exports.getAllRegularChannels = async (req, res) => {
         .filter(id => !isNaN(id));
 
       if (categoryIds.length > 0) {
-        data = await getChannelsByCategories(true, categoryIds, page, limit);
+        data = await getChannelsByCategories(false, categoryIds, page, limit);
       }
     }
 
