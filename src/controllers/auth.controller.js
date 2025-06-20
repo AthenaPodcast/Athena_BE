@@ -163,29 +163,71 @@ const forgotPassword = async (req, res) => {
       }
   
       // 2. Generate reset token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
-  
+      const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
       // 3. Save token in DB
       await pool.query(
-        'UPDATE Accounts SET reset_token = $1, reset_token_expires = $2 WHERE email = $3',
-        [resetToken, expiresAt, email]
+        'UPDATE Accounts SET reset_code = $1, reset_code_expires = $2 WHERE email = $3',
+        [code, expiresAt, email]
       );
   
       // 4. Send email
-      const resetLink = `http://localhost:3000/api/auth/reset-password?token=${resetToken}`;
       await sendEmail(
         email,
-        'Reset your password',
-        `Click the link to reset your password: ${resetLink}`
+        'Reset Code', 
+        `Your password reset code is: ${code}`
       );
   
-      return res.status(200).json({ message: 'Password reset link sent. Please check your email.' });
+      return res.status(200).json({ message: 'Password reset code sent. Please check your email.' });
   
     } catch (err) {
       console.error('Forgot password error:', err);
       res.status(500).json({ message: 'Error processing forgot password' });
     }
+};
+
+// RESET PASS WITH CODE
+const resetPasswordWithCode = async (req, res) => {
+  const { email, code, password, confirmPassword } = req.body;
+
+  if (!email || !code || !password || !confirmPassword) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ message: 'Passwords do not match' });
+  }
+
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  if (!passwordRegex.test(password)) {
+    return res.status(400).json({
+      message: 'Password must be at least 8 characters and contain uppercase, lowercase, and numbers',
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM Accounts WHERE email = $1 AND reset_code = $2 AND reset_code_expires > NOW()',
+      [email, code]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired reset code' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pool.query(
+      'UPDATE Accounts SET password_hash = $1, reset_code = NULL, reset_code_expires = NULL WHERE email = $2',
+      [hashedPassword, email]
+    );
+
+    return res.status(200).json({ message: 'Password reset successful' });
+
+  } catch (err) {
+    console.error('Reset with code error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 };
 
 // RESET PASS
@@ -245,5 +287,6 @@ module.exports = {
   verifyEmail,
   login,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  resetPasswordWithCode
 };
