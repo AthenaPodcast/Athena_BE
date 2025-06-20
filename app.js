@@ -24,6 +24,7 @@ const channelRoutes = require('./src/routes/channel.routes');
 const homeRoutes = require('./src/routes/home.routes');
 const categoryPage = require('./src/routes/category.routes');
 const searchPage = require('./src/routes/search.routes');
+const notificationRoutes = require('./src/routes/notification.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -43,5 +44,8 @@ app.use('/api/channel', channelRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/categories', categoryPage);
 app.use('/api/search', searchPage);
+app.use('/api/notifications', notificationRoutes);
 
 module.exports = app;
+
+require('./src/utils/cleanupNotifications');

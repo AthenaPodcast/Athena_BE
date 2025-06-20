@@ -1,4 +1,5 @@
 const pool = require('../../db');
+const { sendNotification } = require('../utils/notification');
 
 const {
   getPendingRequests,
@@ -40,26 +41,45 @@ const getChannelHistory = async (req, res) => {
 const approveRequest = async (req, res) => {
   const { id } = req.params;
   const request = await updateRequestStatus(id, 'approved');
-  if (request) {
-    await updateAccountToChannel(request.account_id);
-
-    await pool.query(
-      `INSERT INTO channelprofile (account_id, channel_name, channel_description, channel_picture)
-       VALUES ($1, $2, $3, $4)`,
-      [request.account_id, request.channel_name, request.channel_description, request.channel_picture]
-    );
-
-    return res.json({ message: 'Channel approved and profile created' });
+  if (!request) {
+    return res.status(404).json({ message: 'Request not found' });
   }
 
-  res.status(404).json({ message: 'Request not found' });
+  await updateAccountToChannel(request.account_id);
+
+  await pool.query(
+    `INSERT INTO channelprofile (account_id, channel_name, channel_description, channel_picture)
+      VALUES ($1, $2, $3, $4)`,
+    [request.account_id, request.channel_name, request.channel_description, request.channel_picture]
+  );
+
+  await sendNotification(
+    request.account_id,
+    'Channel Request Approved',
+    'Congratulations! Your request to become a channel was approved.',
+    'channel'
+  );
+  
+  return res.json({ message: 'Channel approved and profile created' });
+  
 };
 
 const rejectRequest = async (req, res) => {
   const { id } = req.params;
   const request = await updateRequestStatus(id, 'rejected');
-  if (request) return res.json({ message: 'Request rejected' });
-  res.status(404).json({ message: 'Request not found' });
+  if (!request) {
+    return res.status(404).json({ message: 'Request not found' });
+  }
+
+  const userId = request.account_id;
+
+  await sendNotification(
+    userId,
+    'Channel Request Rejected',
+    'Your request to become a channel was rejected by the admin.',
+    'regular'
+  );
+  return res.json({ message: 'Request rejected' });
 };
 
 const getAllChannelRequests = async (req, res) => {
@@ -185,10 +205,39 @@ const deleteChannel = async (req, res) => {
 
 const deletePodcast = async (req, res) => {
   try {
+    const podcastId = req.params.id;
+
+    const result = await pool.query(
+      `SELECT id, name, channel_id FROM podcasts WHERE id = $1`,
+      [podcastId]
+    );
+    const podcast = result.rows[0];
+
+    if (!podcast) {
+      return res.status(404).json({ message: 'Podcast not found' });
+    }
+
+    //get account_id from channelprofile
+    const accRes = await pool.query(
+      `SELECT account_id FROM channelprofile WHERE id = $1`,
+      [podcast.channel_id]
+    );
+    const channel = accRes.rows[0];
+
     const deleted = await deletePodcastById(req.params.id);
     if (!deleted) {
       return res.status(404).json({ message: 'Podcast not found' });
     }
+
+    if (podcast) {
+      await sendNotification(
+        channel.account_id,
+        'Podcast Deleted',
+        `Your podcast "${podcast.name}" was deleted by the admin.`,
+        'podcast'
+      );
+    }
+
     res.json({ message: 'Podcast and all related data deleted successfully' });
   } catch (err) {
     console.error('Error in deletePodcast:', err);
@@ -198,10 +247,42 @@ const deletePodcast = async (req, res) => {
 
 const deleteEpisode = async (req, res) => {
   try {
-    const result = await deleteEpisodeById(req.params.id);
+    const episodeId = req.params.id;
+
+    const resultt = await pool.query(
+      `SELECT e.id, e.name AS episode_name, p.channel_id 
+      FROM episodes e
+       JOIN podcasts p ON e.podcast_id = p.id
+       WHERE e.id = $1`,
+      [episodeId]
+    );
+    const episode = resultt.rows[0];
+
+    if (!episode) {
+      return res.status(404).json({ message: 'Episode not found' });
+    }
+
+    const accRes = await pool.query(
+      `SELECT account_id FROM channelprofile WHERE id = $1`,
+      [episode.channel_id]
+    );
+    const channel = accRes.rows[0];
+
+
+    const result = await deleteEpisodeById(episodeId);
     if (!result) {
       return res.status(404).json({ message: 'Episode not found' });
     }
+
+    if (channel) {
+      await sendNotification(
+        channel.account_id,
+        'Episode Deleted',
+        `Your episode "${episode.episode_name}" was removed by the admin.`,
+        'episode'
+      );
+    }
+
     res.json({ message: 'Episode and related data deleted successfully' });
   } catch (err) {
     console.error('Error in deleteEpisode:', err);
@@ -243,10 +324,26 @@ const getEpisodeScript = async (req, res) => {
 
 const deleteReview = async (req, res) => {
   try {
-    const deleted = await deleteReviewById(req.params.id);
+    const reviewId = req.params.id;
+
+    // get user who made the review before deleting it
+    const result = await pool.query(`SELECT account_id FROM reviews WHERE id = $1`, [reviewId]);
+    const review = result.rows[0];
+
+    const deleted = await deleteReviewById(reviewId);
     if (!deleted) {
       return res.status(404).json({ message: 'Review not found' });
     }
+
+    if (review) {
+      await sendNotification(
+        review.account_id,
+        'Review Deleted',
+        'Your review was removed by the admin because it was inappropriate.',
+        'review'
+      );
+    }
+
     res.json({ message: 'Review deleted successfully' });
   } catch (err) {
     console.error('Error in deleteReview:', err);

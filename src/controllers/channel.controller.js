@@ -2,6 +2,7 @@ const pool = require('../../db');
 const { transcribeAudioFromUrl } = require('../utils/transcribe');
 const { streamUpload } = require('../utils/cloudinaryUpload');
 const { createEpisode } = require('../models/episode.model');
+const { sendNotification } = require('../utils/notification');
 const path = require('path');
 
 const ffmpeg = require('fluent-ffmpeg');
@@ -373,6 +374,24 @@ exports.fullUploadEpisode = async (req, res) => {
       language
     });
     
+    // fetch podcast name for message
+    const podcastRes = await pool.query(`SELECT name FROM podcasts WHERE id = $1`, [podcast_id]);
+    const podcastName = podcastRes.rows[0]?.name || 'a podcast';
+
+    // fetch all users
+    const userRes = await pool.query(`SELECT id FROM accounts WHERE account_type = 'regular'`);
+    const users = userRes.rows;
+
+    // send notification to each user
+    for (const user of users) {
+      await sendNotification(
+        user.id,
+        'New Episode Released',
+        `A new episode "${name}" was released under podcast "${podcastName}".`,
+        'episode'
+      );
+    }
+
     // add speakers
     for (let speakerName of speakers) {
       speakerName = speakerName.trim();
