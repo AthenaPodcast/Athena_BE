@@ -1,7 +1,7 @@
 const { searchAll, getSuggestions } = require('../models/search.model');
 
 exports.searchHandler = async (req, res) => {
-  const query = req.query.query || '';
+  const query = req.query.query || req.query.q || '';
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
 
@@ -23,7 +23,7 @@ exports.searchHandler = async (req, res) => {
 };
 
 exports.getSearchSuggestions = async (req, res) => {
-  const query = req.query.q;
+  const query = req.query.query || req.query.q || '';
   if (!query || query.trim() === '') {
     return res.status(400).json({ error: 'Query parameter (q) is required' });
   }
