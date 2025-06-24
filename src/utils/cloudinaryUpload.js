@@ -1,5 +1,7 @@
 const cloudinary = require('../config/cloudinary');
 const streamifier = require('streamifier');
+const path = require('path');
+const ytdlpPath = path.join('C:', 'Users', 'hp', 'Downloads', 'yt-dlp.exe');
 const { spawn } = require('child_process');
 
 exports.streamUpload = (fileBuffer, folder = 'default') => {
@@ -31,7 +33,7 @@ exports.uploadAudioFromYoutube = async (youtubeUrl, folder = 'youtube_audio') =>
       }
     );
 
-    const downloader = spawn('yt-dlp', [
+    const downloader = spawn(ytdlpPath, [
       '-f', 'bestaudio',
       '-o', '-', 
       youtubeUrl

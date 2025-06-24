@@ -54,11 +54,12 @@ const ExternalPodcastModel = {
   async getById(id) {
     const result = await pool.query(
       `SELECT p.*, 
-        COALESCE(
-            json_agg(
-            json_build_object('id', c.id, 'name', c.name)
-            ) FILTER (WHERE c.id IS NOT NULL), '[]'
-        ) AS categories
+          COALESCE(
+              json_agg(
+              json_build_object('id', c.id, 'name', c.name)
+              ) FILTER (WHERE c.id IS NOT NULL), '[]'
+          ) AS categories,
+          (SELECT COUNT(*)::int FROM episodes e WHERE e.podcast_id = p.id) AS episode_count
         FROM podcasts p
         LEFT JOIN podcastcategory pc ON p.id = pc.podcast_id
         LEFT JOIN categories c ON pc.category_id = c.id

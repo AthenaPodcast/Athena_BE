@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { signup, login, verifyEmail } = require('../controllers/auth.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
-const { forgotPassword } = require('../controllers/auth.controller');
-const { resetPassword } = require('../controllers/auth.controller');
+const { forgotPassword, resetPassword, resetPasswordWithCode } = require('../controllers/auth.controller');
 
 // Routes
 router.post('/signup', signup);
@@ -20,6 +19,7 @@ router.get('/dashboard', verifyToken, (req, res) => {
 
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
+router.post('/reset-password-with-code', resetPasswordWithCode);
 
 module.exports = router;
 

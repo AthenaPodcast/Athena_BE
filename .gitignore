@@ -150,4 +150,6 @@ temp_episodes/
 # VSCode 
 .vscode/
 .idea/uplfioads/
-uploads/
+
+uploads/*
+!uploads/.gitkeep

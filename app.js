@@ -1,8 +1,10 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 
-// Middlewares
 app.use(express.json()); // to read JSON bodies
+app.use(cors());
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 const authRoutes = require('./src/routes/auth.routes');
@@ -19,6 +21,11 @@ const externalPodcastRoutes = require('./src/routes/externalPodcast.routes');
 const userRoutes = require('./src/routes/user.routes');
 const chatRoutes = require('./src/routes/chat.routes');
 const matcherRoutes = require('./src/routes/matcher.routes');
+const channelRoutes = require('./src/routes/channel.routes');
+const homeRoutes = require('./src/routes/home.routes');
+const categoryPage = require('./src/routes/category.routes');
+const searchPage = require('./src/routes/search.routes');
+const notificationRoutes = require('./src/routes/notification.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -35,5 +42,12 @@ app.use('/api/admin', externalPodcastRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', chatRoutes);
 app.use('/api/matcher', matcherRoutes);
+app.use('/api/channel', channelRoutes);
+app.use('/api/home', homeRoutes);
+app.use('/api/categories', categoryPage);
+app.use('/api/search', searchPage);
+app.use('/api/notifications', notificationRoutes);
 
 module.exports = app;
+
+require('./src/utils/cleanupNotifications');

@@ -3,6 +3,7 @@ const ExternalEpisodeModel = require('../models/externalEpisode.model');
 const { uploadAudioFromYoutube } = require('../utils/cloudinaryUpload');
 const pool = require('../../db');
 const { transcribeAudioFromUrl } = require('../utils/transcribe');
+const { sendNotification } = require('../utils/notification');
 
 exports.createExternalEpisode = async (req, res) => {
   try {
@@ -12,10 +13,13 @@ exports.createExternalEpisode = async (req, res) => {
       description,
       language,
       release_date,
-      picture_url,
       audio_url, 
-      speakers,
     } = req.body;
+
+    const picture_url = req.file?.filename;
+    if (!picture_url) {
+      return res.status(400).json({ error: 'Episode image is required' });
+    }
 
     let youtube_url = req.body.youtube_url;
     let finalName = name;
@@ -70,6 +74,32 @@ exports.createExternalEpisode = async (req, res) => {
 
     const episode = rows[0];
 
+    // fetch podcast nam
+    const podcastRes = await pool.query(`SELECT name FROM podcasts WHERE id = $1`, [podcastId]);
+    const podcastName = podcastRes.rows[0]?.name || 'a podcast';
+
+    // fetch all regular users (non-admin, non-channel)
+    const userRes = await pool.query(`SELECT id FROM accounts WHERE account_type = 'regular'`);
+    const users = userRes.rows;
+
+    for (const user of users) {
+      await sendNotification(
+        user.id,
+        'New Episode Released',
+        `A new episode "${finalName}" was released under podcast "${podcastName}".`,
+        'episode'
+      );
+    }
+    
+    let { speakers } = req.body;
+    
+    if (typeof speakers === 'string') {
+      speakers = speakers
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean); 
+    }
+
     // speakers if provided
     if (Array.isArray(speakers)) {
       for (const speakerName of speakers) {
@@ -93,35 +123,26 @@ exports.createExternalEpisode = async (req, res) => {
 
     // transcribe using Whisper AI
     try {
-    const { script, transcript_json } = await transcribeAudioFromUrl(finalAudioUrl);
-    
-    // 🟡 Add debugging
-    console.log('🔹 Whisper transcription result:');
-    console.log('script preview:', script?.slice?.(0, 80));
-    console.log('transcript_json is array?', Array.isArray(transcript_json));
-    console.log('First word:', transcript_json?.[0]);
-    console.log('Stringified:', JSON.stringify(transcript_json)?.slice?.(0, 100));
+      const { script, transcript_json } = await transcribeAudioFromUrl(finalAudioUrl);
+      
+      // add debugging
+      console.log('Whisper transcription result:');
+      console.log('script preview:', script?.slice?.(0, 80));
+      console.log('transcript_json is array?', Array.isArray(transcript_json));
+      console.log('First word:', transcript_json?.[0]);
+      console.log('Stringified:', JSON.stringify(transcript_json)?.slice?.(0, 100));
 
-    // ✅ Save only if transcript_json is valid
-    if (Array.isArray(transcript_json)) {
-      await pool.query(
-        `UPDATE episodes SET script = $1, transcript_json = $2 WHERE id = $3`,
-        [script, JSON.stringify(transcript_json), episode.id]
-      );
-      episode.script = script;
-      episode.transcript_json = transcript_json;
-    } else {
-      console.warn('⚠️ transcript_json is invalid. Skipping save to DB.');
-    }
-
-    // await pool.query(
-    //     `UPDATE episodes SET script = $1, transcript_json = $2 WHERE id = $3`,
-    //     [script, JSON.stringify(transcript_json), episode.id]
-    // );
-
-    // // attach transcript to response
-    // episode.script = script;
-    // episode.transcript_json = transcript_json;
+      // save only if transcript_json is valid
+      if (Array.isArray(transcript_json)) {
+        await pool.query(
+          `UPDATE episodes SET script = $1, transcript_json = $2 WHERE id = $3`,
+          [script, JSON.stringify(transcript_json), episode.id]
+        );
+        episode.script = script;
+        episode.transcript_json = transcript_json;
+      } else {
+        console.warn('transcript_json is invalid. Skipping save to DB.');
+      }
 
     } catch (transcriptError) {
     console.error('Whisper transcription failed:', transcriptError);
@@ -138,7 +159,7 @@ exports.getEpisodesByPodcast = async (req, res) => {
   try {
     const podcastId = req.params.podcastId;
     const episodes = await ExternalEpisodeModel.getByPodcastId(podcastId);
-    res.status(200).json({ episodes });
+    res.status(200).json( episodes );
   } catch (err) {
     console.error('Error fetching episodes:', err);
     res.status(500).json({ error: 'Failed to fetch episodes' });

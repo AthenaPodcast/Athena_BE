@@ -55,18 +55,65 @@ const getAllRequestsGrouped = async () => {
   const grouped = {};
 
   for (let status of statuses) {
-    const result = await pool.query(
-      `SELECT cr.*, a.email, a.account_type
-       FROM channel_requests cr
-       JOIN accounts a ON cr.account_id = a.id
-       WHERE cr.status = $1
-       ORDER BY cr.requested_at DESC`,
-      [status]
-    );
+    let query = `
+      SELECT cr.*, a.email, a.account_type`;
+
+    if (status === 'approved') {
+      query += `, cp.id AS channel_id `;
+      query += `
+        FROM channel_requests cr
+        JOIN accounts a ON cr.account_id = a.id
+        LEFT JOIN channelprofile cp ON cp.account_id = a.id
+        WHERE cr.status = $1
+        ORDER BY cr.requested_at DESC`;
+    } else {
+      query += `
+        FROM channel_requests cr
+        JOIN accounts a ON cr.account_id = a.id
+        WHERE cr.status = $1
+        ORDER BY cr.requested_at DESC`;
+    }
+
+    const result = await pool.query(query, [status]);
     grouped[status] = result.rows;
   }
 
   return grouped;
+};
+
+const getChannelHistoryGrouped = async () => {
+  const statuses = ['approved', 'rejected'];
+  const grouped = {};
+
+  for (let status of statuses) {
+    let query = `
+      SELECT cr.*, a.email, a.account_type`;
+
+    if (status === 'approved') {
+      query += `, cp.id AS channel_id `;
+      query += `
+        FROM channel_requests cr
+        JOIN accounts a ON cr.account_id = a.id
+        LEFT JOIN channelprofile cp ON cp.account_id = a.id
+        WHERE cr.status = $1
+        ORDER BY cr.requested_at DESC`;
+    } else {
+      query += `
+        FROM channel_requests cr
+        JOIN accounts a ON cr.account_id = a.id
+        WHERE cr.status = $1
+        ORDER BY cr.requested_at DESC`;
+    }
+
+    const result = await pool.query(query, [status]);
+    grouped[status] = result.rows;
+  }
+
+  return grouped;
+};
+
+const deleteChannelRequestById = async (id) => {
+  await pool.query(`DELETE FROM channel_requests WHERE id = $1`, [id]);
 };
 
 module.exports = {
@@ -75,5 +122,7 @@ module.exports = {
   updateRequestStatus,
   updateAccountToChannel,
   hasExistingRequest,
-  getAllRequestsGrouped
+  getAllRequestsGrouped,
+  getChannelHistoryGrouped,
+  deleteChannelRequestById
 };

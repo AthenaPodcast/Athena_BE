@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middlewares/auth.middleware');
 const adminOnly = require('../middlewares/adminOnly.middleware');
+const upload = require('../config/imageMulter');
 
 const {
   createExternalEpisode,
@@ -12,7 +13,7 @@ const {
 
 router.use(verifyToken, adminOnly);
 
-router.post('/podcasts/:podcastId/episodes', createExternalEpisode);
+router.post('/podcasts/:podcastId/episodes', upload.single('episodeImage'), createExternalEpisode);
 
 router.get('/podcasts/:podcastId/episodes', getEpisodesByPodcast);
 router.get('/episodes/:id', getExternalEpisodeById);

@@ -11,9 +11,10 @@ const createEpisode = async (episodeData) => {
     script,
     transcript_json,
     release_date,
+    language
   } = episodeData;
 
-    // Ensure transcript_json is a proper array and not undefined
+  // Ensure transcript_json is a proper array and not undefined
   const safeTranscriptJson = Array.isArray(transcript_json) ? transcript_json : [];
   
   // Validate transcript_json structure
@@ -34,19 +35,16 @@ const createEpisode = async (episodeData) => {
   const query = `
     INSERT INTO episodes (
       podcast_id, name, description, picture_url,
-      audio_url, duration, script, transcript_json, release_date
+      audio_url, duration, script, transcript_json, release_date, language
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
     RETURNING *;
   `;
 
   const values = [
     podcast_id, name, description, picture_url,
-    audio_url, duration, script, jsonString, release_date
+    audio_url, duration, script, jsonString, release_date, language
   ];
-
-  // const result = await pool.query(query, values);
-  // return result.rows[0];
 
   try {
     const result = await pool.query(query, values);
@@ -235,6 +233,106 @@ const getPreviousEpisode = async (episodeId) => {
   return result.rows[0];
 };
 
+const getPaginatedLatestEpisodes = async (page, limit) => {
+  const offset = (page - 1) * limit;
+
+  const data = await pool.query(`
+    SELECT e.id, e.name, e.picture_url, e.created_at,
+           p.name AS podcast_name,
+           cp.created_by_admin AS is_external
+    FROM episodes e
+    JOIN podcasts p ON p.id = e.podcast_id
+    JOIN channelprofile cp ON cp.id = p.channel_id
+    ORDER BY e.created_at DESC
+    LIMIT $1 OFFSET $2
+  `, [limit, offset]);
+
+  // get total count
+  const countResult = await pool.query(`SELECT COUNT(*) FROM episodes`);
+  const totalCount = parseInt(countResult.rows[0].count, 10);
+  const totalPages = Math.ceil(totalCount / limit);
+
+  const episodes = data.rows.map(row => ({
+    ...row,
+    type: row.is_external ? 'external' : 'regular'
+  }));
+
+  return {
+    episodes,
+    total_pages: totalPages,
+    total_count: totalCount
+  };
+};
+
+const getPublicEpisode = async (episodeId, accountId) => {
+  const episodeQuery = `
+    SELECT e.*, 
+           cp.created_by_admin AS is_external,
+           COALESCE(like_count.count, 0) AS like_count,
+           COALESCE(avg_reviews.avg_rating, 0) AS avg_rating,
+           EXISTS (
+             SELECT 1 FROM episode_likes
+             WHERE account_id = $2 AND episode_id = $1 AND liked = true
+           ) AS is_liked
+    FROM episodes e
+    JOIN podcasts p ON e.podcast_id = p.id
+    JOIN channelprofile cp ON p.channel_id = cp.id
+    LEFT JOIN (
+      SELECT episode_id, COUNT(*) AS count
+      FROM episode_likes
+      WHERE liked = true
+      GROUP BY episode_id
+    ) AS like_count ON e.id = like_count.episode_id
+    LEFT JOIN (
+      SELECT episode_id, ROUND(AVG(rating), 2) AS avg_rating
+      FROM reviews
+      GROUP BY episode_id
+    ) AS avg_reviews ON e.id = avg_reviews.episode_id
+    WHERE e.id = $1
+  `;
+
+  const episodeResult = await pool.query(episodeQuery, [episodeId, accountId]);
+  if (episodeResult.rows.length === 0) return null;
+
+  const episode = episodeResult.rows[0];
+  episode.type = episode.is_external ? 'external' : 'regular';
+
+  if (!episode.is_external) {
+    delete episode.youtube_url;
+  }
+
+  const speakersResult = await pool.query(`
+    SELECT s.name
+    FROM speakers s
+    JOIN episode_speakers es ON s.id = es.speaker_id
+    WHERE es.episode_id = $1
+  `, [episodeId]);
+  episode.speakers = speakersResult.rows.map(r => r.name);
+
+  const reviewsResult = await pool.query(`
+    SELECT r.id, r.comment_text, r.rating, r.created_at,
+           CONCAT(u.first_name, ' ', u.last_name) AS user_name
+    FROM reviews r
+    JOIN userprofile u ON r.account_id = u.account_id
+    WHERE r.episode_id = $1
+    ORDER BY r.created_at DESC
+  `, [episodeId]);
+  episode.reviews = reviewsResult.rows;
+
+  const progressResult = await pool.query(`
+    SELECT progress
+    FROM recentlyplayed
+    WHERE episode_id = $1 AND account_id = $2
+    `, [episodeId, accountId]);
+
+  const progressRow = progressResult.rows[0];
+  episode.progress = (!progressRow || progressRow.progress >= episode.duration)
+    ? 0
+    : progressRow.progress;
+
+  return episode;
+};
+
 module.exports = {
   createEpisode,
   getEpisodesByPodcastId,
@@ -246,5 +344,7 @@ module.exports = {
   updateEpisodeScript,
   getEpisodeById,
   getRecommendationsByCategory,
-  getPreviousEpisode
+  getPreviousEpisode,
+  getPaginatedLatestEpisodes,
+  getPublicEpisode
 };

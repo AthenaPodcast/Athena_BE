@@ -10,7 +10,8 @@ const {
     getEpisodeLikeStatus,
     getLikedEpisodes,
     generateScript,
-    fullUploadEpisode 
+    fullUploadEpisode,
+    getLatestEpisodes
   } = require('../controllers/episode.controller');
 
 const { verifyToken } = require('../middlewares/auth.middleware');
@@ -19,6 +20,8 @@ const { submitReview, getEpisodeReviews, deleteReview } = require('../controller
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+
+router.get('/latest', verifyToken, getLatestEpisodes);
 
 // Upload audio to Cloudinary (protected)
 router.post(
@@ -51,7 +54,7 @@ router.get('/:episodeId/like', verifyToken, getEpisodeLikeStatus);
 router.get('/liked', verifyToken, getLikedEpisodes);
 
 // get episode details
-router.get('/:id', getEpisodeDetails);
+router.get('/:id', verifyToken, getEpisodeDetails);
 
 // generate script for the audio
 router.post('/:episodeId/generate-script', verifyToken, requireChannel, generateScript);

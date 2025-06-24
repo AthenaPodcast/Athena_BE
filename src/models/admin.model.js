@@ -52,14 +52,14 @@ const getAllPodcasts = async () => {
       p.name AS podcast_name,
       p.description,
       ARRAY_AGG(DISTINCT e.language) AS languages,
-      cat.name AS category_name,
-      COUNT(e.id) AS episode_count
+      ARRAY_AGG(DISTINCT cat.name) AS categories,
+      COUNT(DISTINCT e.id) AS episode_count
     FROM podcasts p
     JOIN channelprofile c ON p.channel_id = c.id
     LEFT JOIN podcastcategory pc ON p.id = pc.podcast_id
     LEFT JOIN categories cat ON pc.category_id = cat.id
     LEFT JOIN episodes e ON e.podcast_id = p.id
-    GROUP BY p.id, c.channel_name, c.created_by_admin, cat.name
+    GROUP BY p.id, c.channel_name, c.created_by_admin
     ORDER BY c.channel_name, p.name`
   );
 
@@ -71,10 +71,11 @@ const getAllPodcasts = async () => {
     if (!grouped[groupKey]) grouped[groupKey] = [];
 
     grouped[groupKey].push({
+      podcast_id: row.id,
       podcast_name: row.podcast_name,
       description: row.description,
       languages: row.languages.filter(Boolean),
-      category_name: row.category_name,
+      categories: row.categories.filter(Boolean),
       episode_count: parseInt(row.episode_count)
     });
   });
@@ -107,6 +108,7 @@ const getAllEpisodes = async () => {
     if (!grouped[groupKey]) grouped[groupKey] = [];
 
     grouped[groupKey].push({
+      episode_id: row.id,
       episode_name: row.episode_name,
       description: row.description,
       duration: row.duration,
@@ -150,7 +152,7 @@ const getUserDetailsById = async (userId) => {
 
   const reviews = (
     await pool.query(
-      `SELECT r.comment_text, r.rating, r.created_at, e.name AS episode_name
+      `SELECT r.id, r.comment_text, r.rating, r.created_at, r.episode_id, e.name AS episode_name
        FROM reviews r
        JOIN episodes e ON r.episode_id = e.id
        WHERE r.account_id = $1`,
@@ -197,8 +199,8 @@ const getUserDetailsById = async (userId) => {
       age: basicInfo.age,
       profile_picture: basicInfo.profile_picture
     },
-    saved_podcasts: { count: savedPodcasts.length, list: savedPodcasts },
-    liked_episodes: { count: likedEpisodes.length, list: likedEpisodes },
+    saved_podcasts: savedPodcasts.length ,
+    liked_episodes: likedEpisodes.length ,
     reviews,
     listening_time,
     category_breakdown
@@ -221,12 +223,15 @@ const getChannelDetailsById = async (channelId) => {
 
   const podcastQuery = isExternal
     ? `SELECT p.id, p.name FROM podcasts p WHERE p.channel_id = $1`
-    : `SELECT p.id, p.name FROM podcasts p WHERE p.channel_account_id = $1`;
+    : `SELECT p.id, p.name FROM podcasts p WHERE p.channel_id = $1`;
 
   const podcastIdParam = isExternal ? channelId : channel.account_id;
   const podcastsRes = await pool.query(podcastQuery, [podcastIdParam]);
   const podcasts = podcastsRes.rows;
-  const podcastNames = podcasts.map(p => p.name);
+  const podcastList = podcasts.map(p => ({
+    id: p.id,
+    name: p.name
+  }));
   const podcastIds = podcasts.map(p => p.id);
 
   let episodeCount = 0;
@@ -253,12 +258,13 @@ const getChannelDetailsById = async (channelId) => {
     description: channel.channel_description,
     channel_type: isExternal ? 'external' : 'regular',
     podcast_count: podcasts.length,
-    podcasts: podcastNames,
+    podcasts: podcastList,
     episode_count: episodeCount,
     languages,
     joined_at: channel.created_at
   };
 };
+
 
 const getPodcastDetailsById = async (podcastId) => {
   const podcastRes = await pool.query(
@@ -285,12 +291,15 @@ const getPodcastDetailsById = async (podcastId) => {
   const categories = categoryRes.rows.map(r => r.name);
 
   const episodeRes = await pool.query(
-    `SELECT name FROM episodes
+    `SELECT id, name FROM episodes
      WHERE podcast_id = $1
      ORDER BY created_at ASC`,
     [podcastId]
   );
-  const episodes = episodeRes.rows.map(r => r.name);
+  const episodes = episodeRes.rows.map(r => ({
+    id: r.id,
+    name: r.name
+  }));
 
   const saveRes = await pool.query(
     `SELECT COUNT(*) FROM podcast_saves
@@ -353,7 +362,7 @@ const getEpisodeDetailsById = async (episodeId) => {
   const like_count = parseInt(likeRes.rows[0].count);
 
   const reviewRes = await pool.query(
-    `SELECT r.rating, r.comment_text, r.created_at,
+    `SELECT r.id, r.rating, r.comment_text, r.created_at,
             CONCAT(u.first_name, ' ', u.last_name) AS user_name
      FROM reviews r
      JOIN accounts a ON r.account_id = a.id
@@ -370,6 +379,7 @@ const getEpisodeDetailsById = async (episodeId) => {
   const avg_rating = avgRes.rows[0].avg ? parseFloat(avgRes.rows[0].avg).toFixed(1) : null;
 
   const reviews = reviewRes.rows.map(r => ({
+    id: r.id,
     user_name: r.user_name,
     rating: r.rating,
     comment: r.comment_text,
@@ -566,17 +576,18 @@ const deleteReviewById = async (reviewId) => {
 
 const getAdminProfileById = async (adminId) => {
   const result = await pool.query(
-    `SELECT u.first_name, u.last_name, u.profile_picture
+    `SELECT u.first_name, u.last_name, u.profile_picture, a.email, a.phone
      FROM userprofile u
+     JOIN accounts a ON u.account_id = a.id
      WHERE u.account_id = $1`,
     [adminId]
   );
 
   if (result.rows.length === 0) return null;
 
-  const { first_name, last_name, profile_picture } = result.rows[0];
+  const { first_name, last_name, profile_picture, email, phone } = result.rows[0];
   const full_name = `${first_name} ${last_name}`;
-  return { name: full_name, profile_picture };
+  return { name: full_name, profile_picture, email, phone };
 };
 
 module.exports = {
