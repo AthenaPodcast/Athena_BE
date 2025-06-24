@@ -61,9 +61,9 @@ const signup = async (req, res) => {
       await transporter.sendMail({
         from: `"Athena" <${process.env.EMAIL_FROM}>`,
         to: email,
-        subject: 'Verify your email - AthenaBroadcast',
+        subject: 'Verify your email - AthenaPodcast',
         html: `
-          <h3>Welcome to AthenaBroadcast, ${firstName}!</h3>
+          <h3>Welcome to AthenaPodcast, ${firstName}!</h3>
           <p>Please click the link below to verify your email:</p>
           <a href="${verificationLink}">${verificationLink}</a>
         `,
@@ -173,11 +173,15 @@ const forgotPassword = async (req, res) => {
       );
   
       // 4. Send email
-      await sendEmail(
-        email,
-        'Reset Code', 
-        `Your password reset code is: ${code}`
-      );
+      await transporter.sendMail({
+        from: `"Athena" <${process.env.EMAIL_FROM}>`,
+        to: email,
+        subject: 'Reset your password - AthenaPodcast',
+        html: `
+          <h3>Welcome to AthenaPodcast!</h3>
+          <p>Your password reset code is: ${code}</p>
+        `,
+      });
   
       return res.status(200).json({ message: 'Password reset code sent. Please check your email.' });
   
