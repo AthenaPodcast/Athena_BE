@@ -1,6 +1,7 @@
 import sys
 import os
 from pathlib import Path
+from typing import Optional
 from dotenv import load_dotenv
 
 env_path = Path(__file__).resolve().parent / ".env"
@@ -16,6 +17,7 @@ import shutil
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi import Query
 
 app = FastAPI()
 djv = Dejavu(config)
@@ -48,6 +50,26 @@ async def match_audio(audio: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
         
+    finally:
+        if os.path.exists(file_location):
+            os.remove(file_location)
+
+@app.post("/fingerprint")
+async def fingerprint_audio(
+    audio: UploadFile = File(...),
+    song_name: Optional[str] = Query(None)
+):
+    file_location = f"temp_{audio.filename}"
+    try:
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(audio.file, buffer)
+
+        name = song_name or os.path.basename(file_location)
+
+        djv.fingerprint_file(file_location, song_name=name)
+        return JSONResponse(content={"message": "Fingerprinting successful", "used_name": name})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
     finally:
         if os.path.exists(file_location):
             os.remove(file_location)

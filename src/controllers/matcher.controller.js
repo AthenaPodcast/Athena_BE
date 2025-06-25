@@ -1,61 +1,72 @@
 const axios = require('axios');
 const pool = require('../../db');
-const fs = require('fs');
-const FormData = require('form-data');
 const path = require('path');
+const fs = require('fs');
+const tmp = require('tmp');
+const FormData = require('form-data');
+
+const MATCHER_URL = process.env.MATCHER_MATCH_URL || 'http://127.0.0.1:8000/match-audio';
 
 exports.matchAudio = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No audio file provided' });
-    }
+    const audioFile = req.file;
+    if (!audioFile) return res.status(400).json({ error: 'Audio file is required' });
 
-    // Prepare the audio file to forward to the Python matcher microservice
+    // save to temp file
+    const tmpFile = tmp.fileSync({ postfix: path.extname(audioFile.originalname) });
+    fs.writeFileSync(tmpFile.name, audioFile.buffer);
+
+    // prepare form data
     const formData = new FormData();
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(__dirname, '../../', req.file.path);
-    formData.append('audio', fs.createReadStream(filePath));
+    formData.append('audio', fs.createReadStream(tmpFile.name));
 
-    const matcherResponse = await axios.post(
-      'http://localhost:8000/match-audio', // Python matcher endpoint
-      formData,
-      {
-        headers: formData.getHeaders(),
-      }
-    );
-
-    // Delete the uploaded temp file
-    fs.unlinkSync(filePath);
-
-    const matchResult = matcherResponse.data;
-
-    if (!matchResult || !matchResult.song_name) {
-      return res.status(404).json({ success: false, error: 'No match found' });
-    }
-
-    const publicId = matchResult.song_name;
-
-    // Look up the episode from the Athena database using the audio_url
-    const result = await pool.query(
-      `SELECT * FROM episodes WHERE audio_url ILIKE $1`,
-      [`%${publicId}%`]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Match found, but episode not in Athena DB' });
-    }
-
-    return res.json({
-      success: true,
-      matchedEpisode: result.rows[0],
+    const matcherRes = await axios.post(MATCHER_URL, formData, {
+      headers: formData.getHeaders()
     });
 
+    tmpFile.removeCallback();
+
+    const results = matcherRes.data.results;
+    if (!results || results.length === 0) return res.status(404).json({ error: 'No match found' });
+
+    const bestMatch = results[0];
+    const songName = bestMatch.song_name;
+
+    // extract episode ID from songName (if it contains Cloudinary path like 'episods/<public_id>')
+    const episodeId = parseInt(songName?.split('/')[1], 10);
+    if (isNaN(episodeId)) {
+      return res.status(404).json({ error: 'Invalid episode ID in match result' });
+    }
+
+    const dbRes = await pool.query(
+      `SELECT 
+        e.id, 
+        e.name, 
+        e.picture_url,
+        p.name AS podcast_name,
+        cp.created_by_admin AS is_external
+      FROM episodes e
+      JOIN podcasts p ON p.id = e.podcast_id
+      JOIN channelprofile cp ON cp.id = p.channel_id
+      WHERE e.id = $1`,
+      [episodeId]
+    );
+
+
+    if (dbRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Matched episode not found in DB' });
+    }
+
+    return res.status(200).json({ matched: dbRes.rows[0] });
+
+
+
   } catch (err) {
-    console.error('Matching error:', err.message);
-    return res.status(500).json({ success: false, error: 'Internal error during match' });
+    console.error('matchAudio error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 exports.fingerprintEpisode = async (req, res) => {
   try {

@@ -3,7 +3,10 @@ const { transcribeAudioFromUrl } = require('../utils/transcribe');
 const { streamUpload } = require('../utils/cloudinaryUpload');
 const { createEpisode } = require('../models/episode.model');
 const { sendNotification } = require('../utils/notification');
+const axios = require('axios');
+const tmp = require('tmp');
 const path = require('path');
+const FormData = require('form-data');
 
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
@@ -293,7 +296,7 @@ exports.fullUploadEpisode = async (req, res) => {
       return res.status(400).json({ error: 'Audio file is required' });
     }
 
-    const audioUrl = (await streamUpload(audioFile.buffer, 'episods')).secure_url;
+    // const audioUrl = (await streamUpload(audioFile.buffer, 'episods')).secure_url;
 
     if (req.user.type !== 'channel') {
       return res.status(403).json({ error: 'Only channel accounts can upload episodes' });
@@ -302,8 +305,22 @@ exports.fullUploadEpisode = async (req, res) => {
     if (!audioFile) {
       return res.status(400).json({ error: 'Audio file is required' });
     }
-   
 
+    const audioTempUpload = await streamUpload(audioFile.buffer, 'episods/temp'); 
+    const audioUrl = audioTempUpload.secure_url;
+
+    const tmpFile = tmp.fileSync({ postfix: '.mp3' });
+    const tempPath = tmpFile.name;
+
+    const writer = fs.createWriteStream(tempPath);
+    const response = await axios({ method: 'GET', url: audioUrl, responseType: 'stream' });
+    response.data.pipe(writer);
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+    
+    
     if (typeof speakers === 'string') {
       speakers = speakers.split(',').map(name => name.trim()).filter(name => name.length > 0);
     }
@@ -366,7 +383,7 @@ exports.fullUploadEpisode = async (req, res) => {
       name,
       description,
       picture_url,
-      audio_url: audioUrl,
+      audio_url: '',
       duration,
       script,
       transcript_json: transcriptJson,
@@ -374,6 +391,23 @@ exports.fullUploadEpisode = async (req, res) => {
       language
     });
     
+    
+    const finalUpload = await streamUpload(audioFile.buffer, `episods/${episode.id}`);
+    const finalAudioUrl = finalUpload.secure_url;
+
+    await pool.query(`UPDATE episodes SET audio_url = $1 WHERE id = $2`, [finalAudioUrl, episode.id]);
+
+    const formData = new FormData();
+    formData.append('audio', fs.createReadStream(tempPath));
+
+    await axios.post('http://127.0.0.1:8000/fingerprint', formData, {
+      headers: formData.getHeaders(),
+      params: { song_name: `episods/${episode.id}` },
+    });
+
+    // cleanup
+    tmpFile.removeCallback();
+
     // fetch podcast name for message
     const podcastRes = await pool.query(`SELECT name FROM podcasts WHERE id = $1`, [podcast_id]);
     const podcastName = podcastRes.rows[0]?.name || 'a podcast';
@@ -427,7 +461,7 @@ exports.fullUploadEpisode = async (req, res) => {
       message: 'Episode uploaded and transcribed successfully',
       episode_id: episode.id,
       picture_url,
-      audio_url: episode.audio_url,
+      audio_url: finalAudioUrl,
       duration: episode.duration,
       script: episode.script,
       transcript_json: episode.transcript_json,
