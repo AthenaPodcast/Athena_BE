@@ -78,6 +78,8 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+recommender/.env
+matcher/.env
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -138,14 +140,18 @@ dist
 # Ignore Python virtual environments
 .venv/
 
-# Ignore environment variables
-recommender/.env
-
 # Ignore compiled Python files and cache
 __pycache__/
 *.pyc
 
+# Temp files
+temp_episodes/
+
+# VSCode 
+.vscode/
+.idea/uplfioads/
+
 uploads/*
 !uploads/.gitkeep
 
-.vscode/
+matcher/test/

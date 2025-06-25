@@ -2,7 +2,7 @@ const axios = require('axios');
 
 async function getRecommendations(userId) {
   try {
-    const response = await axios.get(`http://localhost:8000/recommend`, {
+    const response = await axios.get(`http://localhost:8001/recommend`, {
       params: { user_id: userId }
     });
 
